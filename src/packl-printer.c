@@ -18,9 +18,14 @@ char *token_kinds[] = {
     "=",
     "+",
     "-",
+    "*",
+    "/",
+    "%",
 
     "proc",
     "var",
+    "if",
+    "else",
 };
 
 void packl_print_func_call(Func_Call func_call, size_t indent);
@@ -149,11 +154,22 @@ void packl_print_var_dec(Var_Declaration var_dec, size_t indent) {
     packl_print_expr(var_dec.value, indent + 1);
 }
 
+void packl_print_else(AST ast, size_t indent) {
+    print_indent(indent);
+    printf("else:\n");
+    packl_print_body(ast, indent + 1);
+}
+
 void packl_print_if(If_Statement fi, size_t indent) {
     print_indent(indent);
     printf("condition:\n");
     packl_print_expr(fi.condition, indent + 1);
+
     packl_print_body(*fi.body, indent);
+
+    if (fi.esle) {
+        packl_print_else(*fi.esle, indent);
+    }
 }
 
 void packl_print_native_call_node(Node node, size_t indent) {

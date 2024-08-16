@@ -96,6 +96,9 @@ enum Token_Kind {
     TOKEN_KIND_PROC,
     TOKEN_KIND_VAR,
     TOKEN_KIND_IF,
+    TOKEN_KIND_ELSE,
+
+    TOKEN_KIND_END,
 
 
     COUNT_TOKEN_KINDS,
@@ -162,6 +165,7 @@ struct Expression {
 struct If_Statement {
     Expression condition;
     AST *body;
+    AST *esle;                    // the else part of the if statement, will be set to NULL if none is provided
 };
 
 enum PACKL_Type {

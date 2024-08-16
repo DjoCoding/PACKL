@@ -50,6 +50,8 @@ void packl_destroy_if(If_Statement fi) {
 
     packl_destroy_ast(*fi.body);
     free(fi.body);
+
+    if(fi.esle) { packl_destroy_ast(*fi.esle); free(fi.esle); }
 }
 
 void packl_destroy_node(Node node) {

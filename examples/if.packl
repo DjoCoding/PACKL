@@ -5,6 +5,9 @@ proc foo() {
 proc main() {
     if (1) {
         foo();
+    } else {
+        bar();
     }
+
     exit(0);
 }

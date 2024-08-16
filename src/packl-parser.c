@@ -54,7 +54,7 @@ size_t packl_get_tokens_number(PACKL *self) {
 }
 
 bool packl_parser_eot(PACKL *self) {
-    return (self->tokens.count <= self->parser.current);
+    return ppeek(self).kind == TOKEN_KIND_END;
 }
 
 void packl_parser_expect(PACKL *self, Token_Kind kind, Token *token) {
@@ -239,7 +239,7 @@ int isadditive(Token_Kind kind) {
 }
 
 Expression packl_parser_parse_primary_expr(PACKL *self) {
-    if (peot(self)) { PACKL_ERROR(self->filename, "expected more tokens for the expression"); }
+    if (peot(self)) { PACKL_ERROR(self->filename, "expected more tokens for the expression but end found"); }
 
     Token token = ppeek(self);
     
@@ -344,26 +344,48 @@ Node packl_parser_parse_native_call(PACKL *self) {
     PACKL_ERROR(self->filename, "expected `(` after the native call " SV_FMT "\n", SV_UNWRAP(ppeek(self).text));
 }
 
+Node packl_get_node_from_if(If_Statement fi) {
+    return (Node) { .kind = NODE_KIND_IF, .as.fi = fi };
+}
+
 If_Statement packl_parser_parse_if_statement(PACKL *self) {
     If_Statement fi = {0};
 
     // consume the `if` token 
     pexp(self, TOKEN_KIND_IF, NULL);
 
-    if (peot(self)) { PACKL_ERROR(self->filename, "expected `if` condition but end of tokend found"); }
+    if (peot(self)) { PACKL_ERROR(self->filename, "expected `if` condition but end found"); }
 
     if (ppeek(self).kind == TOKEN_KIND_OPEN_PARENT) {
         padv(self);
         fi.condition = packl_parser_parse_expr(self);
         pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+        pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, NULL);
     } else {
         fi.condition = packl_parser_parse_expr(self);
     }
 
-    pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, NULL);
     fi.body = malloc(sizeof(AST));
     *fi.body = packl_parser_parse_body(self);
     pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, NULL);
+
+    if (peot(self)) { PACKL_ERROR(self->filename, "expected more tokens but end found"); }
+
+    if (ppeek(self).kind == TOKEN_KIND_ELSE) {
+        padv(self);
+        fi.esle = malloc(sizeof(AST));
+        
+        if (ppeek(self).kind == TOKEN_KIND_OPEN_CURLY_BRACE) {
+            padv(self);
+            *fi.esle = packl_parser_parse_body(self);
+            pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, NULL);
+        } else {
+            If_Statement elseif = packl_parser_parse_if_statement(self);
+            Node node = packl_get_node_from_if(elseif);
+            DA_INIT(fi.esle, sizeof(Node));
+            DA_APPEND(fi.esle, node);
+        }
+    } 
 
     return fi;
 }

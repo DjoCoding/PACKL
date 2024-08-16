@@ -36,6 +36,7 @@ char *keywords[] = {
     "proc",
     "var",
     "if",
+    "else",
 };
 
 char *natives[] = {
@@ -47,6 +48,7 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_PROC,
     TOKEN_KIND_VAR,
     TOKEN_KIND_IF,
+    TOKEN_KIND_ELSE,
 };
 
 char packl_lexer_peek(PACKL *self) {
@@ -167,4 +169,5 @@ void packl_lexer_lex(PACKL *self) {
         Token token = lread(self);
         DA_APPEND(&self->tokens, token);
     }
+    DA_APPEND(&self->tokens, ((Token) { .kind = TOKEN_KIND_END }));
 }

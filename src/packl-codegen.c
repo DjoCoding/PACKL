@@ -19,8 +19,8 @@ void fprint_indent(FILE *f, size_t indent) {
     }
 }
 
-void packl_generate_label(FILE *f, PACKL *self) {
-    fprintf(f, "#label_%zu:\n", self->label_value++);
+void packl_generate_label(FILE *f, size_t label_value) {
+    fprintf(f, "#label_%zu:\n", label_value);
 }
 
 void packl_generate_push(FILE *f, PACKL *self, int64_t value) {
@@ -95,7 +95,7 @@ void packl_generate_syscall(FILE *f, PACKL *self, int64_t value) {
 }
 
 void packl_generate_jmp(FILE *f, PACKL *self, size_t value) {
-    fprintf(f, "jmp $label_%zu", value);
+    fprintf(f, "jmp $label_%zu\n", value);
 }
 
 void packl_generate_cmp(FILE *f, PACKL *self) {
@@ -329,7 +329,7 @@ void packl_generate_proc_def_code(FILE *f, PACKL *self, Proc_Def proc_def, size_
     packl_push_item_in_current_context(self, item);
     
     fprint_indent(f, indent);
-    packl_generate_label(f, self);
+    packl_generate_label(f, self->label_value++);
 
     packl_generate_body_code(f, self, *proc_def.body, indent + 1);
 
@@ -357,21 +357,47 @@ void packl_generate_var_dec_code(FILE *f, PACKL *self, Var_Declaration var_dec, 
     packl_generate_expr_code(f, self, var_dec.value, indent);
 }
 
+// void packl_generate_else_code(FILE *f, PACKL *self, AST ast, size_t indent) {
+//     // generate label for the else block
+//     packl_generate_label(f, self->label_value);
+//     packl_generate_body_code(f, self, ast, indent + 1);
+// }
+
 void packl_generate_if_code(FILE *f, PACKL *self, If_Statement fi, size_t indent) {
     // evaluate the condition
     packl_generate_expr_code(f, self, fi.condition, indent);
-    
-    fprint_indent(f, indent);
-    packl_generate_jz(f, self, self->label_value++); // incrementing the value of the labels just to handle the nested ifs 
 
-    // make the body code
+    size_t label = self->label_value;
+    
+    // generate a jump if the the top of the stack is 0 to the else block or quit the current block
+    fprint_indent(f, indent);
+    packl_generate_jz(f, self, label);
+
+    self->label_value += 2;      // we already reserved two labels 
+
+    // generate the body code 
     packl_generate_body_code(f, self, *fi.body, indent);
 
-    // generate label for the after if block
-    self->label_value--;                            // remove the one added
-    packl_generate_label(f, self);
-    self->label_value--;                            // since one is added through the generate label function we have to remove it
+    // generate an unconditional jump to then end of the if statement
+    fprint_indent(f, indent);
+    packl_generate_jmp(f, self, label + 1);
+
+    // check for the else block
+    if (fi.esle) {
+        // generate the else label
+        packl_generate_label(f, label);
+
+        // generate the body code of the else
+        packl_generate_body_code(f, self, *fi.esle, indent);
+    } else {
+        // generate a label to quit the current block
+        packl_generate_label(f, label);
+    }
+
+    // generate the end of the if statement label
+    packl_generate_label(f, label + 1);
 }
+
 
 void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t indent) {
     switch(node.kind) {

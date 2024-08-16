@@ -1,0 +1,40 @@
+proc foo() {
+    write("foo\n");
+}
+
+proc bar() {
+    write("bar\n");
+}
+
+proc hello() {
+    write("Hello");
+}
+
+proc main() {
+    if (1) {
+        if (1) {
+            if (1) {
+                if (1) {
+                    hello();
+                } else if (1) {
+                    hello();
+                } else if (1) {
+                    hello();
+                } else {
+                    bar();
+                }
+            } else {
+                hello();
+            }
+        } else if (1) {
+            hello();
+        }
+    }
+
+    exit(20);
+}
+
+
+
+
+
