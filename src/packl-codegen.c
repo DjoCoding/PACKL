@@ -1,5 +1,15 @@
 #include "packl-codegen.h"
 
+size_t number_of_popped_values[] = {
+    3,       // write  
+    1,       // read: 2 for reading and 1 for push
+    0,       // alloc: 1 for the size and 1 for the push
+    1,       // free
+    1,       // open: 2 for the filepath and the mode and one of the file pointer (push) 
+    1,       // close 
+    1,       // exit
+};
+
 void packl_generate_statements_code(FILE *f, PACKL *self, AST ast, size_t indent);
 
 void fprint_indent(FILE *f, size_t indent) {
@@ -8,42 +18,185 @@ void fprint_indent(FILE *f, size_t indent) {
     }
 }
 
-void packl_generate_push(FILE *f, String_View view, size_t indent) {
-    fprint_indent(f, indent);
-    fprintf(f, "push " SV_FMT "\n", SV_UNWRAP(view));
+void packl_generate_label(FILE *f, PACKL *self) {
+    fprintf(f, "#label_%zu:\n", self->label_value++);
 }
 
-void packl_generate_write(FILE *f,  String_View view, size_t indent) {
+void packl_generate_push(FILE *f, PACKL *self, int64_t value) {
+    fprintf(f, "push %ld\n", value);
+    self->stack_size++;    
+}
+
+void packl_generate_pushs(FILE *f, PACKL *self, String_View value) {
+    fprintf(f, "pushs " SV_FMT "\n", SV_UNWRAP(value));
+    self->stack_size++;    
+}
+
+void packl_generate_nop(FILE *f, PACKL *self) {
+    fprintf(f, "nop\n");
+}
+
+void packl_generate_halt(FILE *f, PACKL *self) {
+    fprintf(f, "halt\n");    
+}
+
+void packl_generate_pop(FILE *f, PACKL *self) {
+    fprintf(f, "pop\n");
+    self->stack_size--;
+}
+
+void packl_generate_add(FILE *f, PACKL *self) {
+    fprintf(f, "add\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_sub(FILE *f, PACKL *self) {
+    fprintf(f, "sub\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_mul(FILE *f, PACKL *self) {
+    fprintf(f, "mul\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_div(FILE *f, PACKL *self) {
+    fprintf(f, "div\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_mod(FILE *f, PACKL *self) {
+    fprintf(f, "mod\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_swap(FILE *f, PACKL *self) {
+    fprintf(f, "swap\n");
+}
+
+void packl_generate_dup(FILE *f, PACKL *self) {
+    fprintf(f, "dup\n");
+    self->stack_size++;
+}
+
+void packl_generate_inswap(FILE *f, PACKL *self, int64_t value) {
+    fprintf(f, "inswap %ld\n", value);
+}
+
+void packl_generate_indup(FILE *f, PACKL *self, int64_t value) {
+    fprintf(f, "indup %ld\n", value);
+    self->stack_size++;
+} 
+
+void packl_generate_syscall(FILE *f, PACKL *self, int64_t value) {
+    fprintf(f, "syscall %ld\n", value);
+    self->stack_size -= number_of_popped_values[value];
+}
+
+void packl_generate_jmp(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "jmp $label_%zu", value);
+}
+
+void packl_generate_cmp(FILE *f, PACKL *self) {
+    fprintf(f, "cmp\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_jz(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "jz $label_%zu", value);
+    self->stack_size--;
+}
+
+
+void packl_generate_jle(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "jle $label_%zu", value);
+    self->stack_size--;
+}
+
+
+void packl_generate_jl(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "jl $label_%zu", value);
+    self->stack_size--;
+}
+
+
+void packl_generate_jge(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "jge $label_%zu", value);
+    self->stack_size--;
+}
+
+
+void packl_generate_jg(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "jg $label_%zu", value);
+    self->stack_size--;
+}
+
+void packl_generate_putc(FILE *f, PACKL *self) {
+    fprintf(f, "putc\n");
+    self->stack_size--;
+}
+
+void packl_generate_call(FILE *f, PACKL *self, size_t value) {
+    fprintf(f, "call $label_%zu\n", value);
+}
+
+void packl_generate_ret(FILE *f, PACKL *self) {
+    fprintf(f, "ret\n");
+}
+
+void packl_generate_smem(FILE *f, PACKL *self) {
+    fprintf(f, "smem\n");
+    self->stack_size -= 3;
+}
+
+void packl_generate_gmem(FILE *f, PACKL *self) {
+    fprintf(f, "gmem\n");
+    self->stack_size -= 2;
+}
+
+void packl_generate_readc(FILE *f, PACKL *self) {
+    fprintf(f, "readc\n");
+    self->stack_size++;
+}
+
+void packl_generate_getc(FILE *f, PACKL *self) {
+    fprintf(f, "getc\n");
+}
+
+void packl_generate_setc(FILE *f, PACKL *self) {
+    fprintf(f, "setc\n");
+    self->stack_size--;
+}
+
+void packl_generate_write(FILE *f, PACKL *self, String_View view, size_t indent) {
     // push the stdout for the moment
     fprint_indent(f, indent);
-    fprintf(f, "push 0\n");
+    packl_generate_push(f, self, 0);
 
     fprint_indent(f, indent);
-    fprintf(f, "pushs \"" SV_FMT "\"\n", SV_UNWRAP(view));
+    packl_generate_pushs(f, self, view);
     
     fprint_indent(f, indent);
-    fprintf(f, "push %zu\n", view.count);
+    packl_generate_push(f, self, (int64_t)view.count);
     
     fprint_indent(f, indent);
-    fprintf(f, "syscall 0\n");
+    packl_generate_syscall(f, self, 0);
 }
 
-void packl_generate_exit(FILE *f, String_View view, size_t indent) {
+void packl_generate_exit(FILE *f, PACKL *self, String_View view, size_t indent) {
     fprint_indent(f, indent);
-    fprintf(f, "push " SV_FMT "\n", SV_UNWRAP(view));
+    packl_generate_push(f, self, integer_from_sv(view));
 
     fprint_indent(f, indent);
-    fprintf(f, "syscall 6\n");
-}
-
-void packl_generate_call(FILE *f, size_t label, size_t indent) {
-    fprint_indent(f, indent);
-    fprintf(f, "call %zu\n", label);
+    packl_generate_syscall(f, self, 6);
 }
 
 void packl_generate_push_arg_code(FILE *f, PACKL *self, Func_Call_Arg arg, size_t indent) {
-    // TODO: add the argument id check
-    packl_generate_push(f, arg.value, indent);
+    (void)f;
+    (void)self;
+    (void)arg;
+    (void)indent;
+    TODO("add arguments push to the stack");
 }
 
 void packl_generate_push_args_code(FILE *f, PACKL *self, Func_Call_Args args, size_t indent) {
@@ -54,27 +207,25 @@ void packl_generate_push_args_code(FILE *f, PACKL *self, Func_Call_Args args, si
 
 void packl_generate_func_call_code(FILE *f, PACKL *self, Func_Call func_call, size_t indent) {
     Context_Item *item = packl_get_context_item_in_all_contexts(self, func_call.name);
-    if (!item) { PACKL_ERROR(self->filename, "function " SV_FMT " called but not decalred", SV_UNWRAP(func_call.name)); }
+    if (!item) { PACKL_ERROR(self->filename, "function `" SV_FMT "` called but not decalred", SV_UNWRAP(func_call.name)); }
     
     packl_generate_push_args_code(f, self, func_call.args, indent);
 
-    packl_generate_call(f, item->as.proc.label_value, indent);
+    fprint_indent(f, indent);
+    packl_generate_call(f, self, item->as.proc.label_value);
 }
 
 void packl_generate_native_call_code(FILE *f, PACKL *self, Func_Call func_call, size_t indent) {
     if (sv_eq(func_call.name, SV("write"))) {
-        packl_generate_write(f, func_call.args.items[0].value, indent);
+        packl_generate_write(f, self, func_call.args.items[0].value, indent);
     } else if (sv_eq(func_call.name, SV("exit"))) {
-        packl_generate_exit(f, func_call.args.items[0].value, indent);
+        packl_generate_exit(f, self, func_call.args.items[0].value, indent);
     } else { ASSERT(false, "unreachable"); }
 }
 
 void packl_generate_proc_def_code(FILE *f, PACKL *self, Proc_Def proc_def, size_t indent) {
-    fprint_indent(f, indent);
-
     // check if the procedure is already defined in the current context
     Context_Item *found = packl_get_context_item_in_current_context(self, proc_def.name);
-
     if (found) { PACKL_ERROR(self->filename, "procedure " SV_FMT " already declared in the current scope as %s", SV_UNWRAP(proc_def.name), packl_get_context_item_type_as_cstr(found->type)); }
 
     // add the procedure to the current context
@@ -93,7 +244,8 @@ void packl_generate_proc_def_code(FILE *f, PACKL *self, Proc_Def proc_def, size_
 
     packl_push_item_in_current_context(self, item);
     
-    fprintf(f, "#label_%zu:\n", self->label_value++);
+    fprint_indent(f, indent);
+    packl_generate_label(f, self);
 
     // push a new context for the procedure definition
     packl_push_new_context(self);
@@ -105,8 +257,29 @@ void packl_generate_proc_def_code(FILE *f, PACKL *self, Proc_Def proc_def, size_
     packl_pop_context(self);
 
     fprint_indent(f, indent + 1);
-    fprintf(f, "ret\n\n");
+    packl_generate_ret(f, self);
 } 
+
+void packl_generate_var_dec_code(FILE *f, PACKL *self, Var_Declaration var_dec, size_t indent) {
+    // check if the variable is already defined in the current context
+    Context_Item *found = packl_get_context_item_in_current_context(self, var_dec.name);
+    if (found) { PACKL_ERROR(self->filename, "variable " SV_FMT " already declared in the current scope as %s", SV_UNWRAP(var_dec.name), packl_get_context_item_type_as_cstr(found->type)); }
+
+    Variable variable = {0};
+    variable.type = var_dec.type;
+    variable.stack_pos = self->stack_size;
+
+    Context_Item item = {0};
+    item.name = var_dec.name;
+    item.type = CONTEXT_ITEM_TYPE_VARIABLE;
+    item.as.variable = variable;
+
+    packl_push_item_in_current_context(self, item);
+
+    // support for only integer variables
+    fprint_indent(f, indent);
+    packl_generate_push(f, self, integer_from_sv(var_dec.value));
+}
 
 void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t indent) {
     if (node.kind == NODE_KIND_NATIVE_CALL) {
@@ -114,7 +287,9 @@ void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t inden
     } else if (node.kind == NODE_KIND_FUNC_CALL) {
         packl_generate_func_call_code(f, self, node.as.func_call, indent);
     } else if (node.kind == NODE_KIND_PROC_DEF) {
-        packl_generate_proc_def_code(f, self, node.as.proc_def, indent);
+        packl_generate_proc_def_code(f, self, node.as.proc_def, indent);        
+    } else if (node.kind == NODE_KIND_VAR_DECLARATION) {
+        packl_generate_var_dec_code(f, self, node.as.var_dec, indent);
     } else { ASSERT(false, "unreachable"); }
 }
 

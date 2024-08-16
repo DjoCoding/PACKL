@@ -1,0 +1,8 @@
+proc printHello() {
+	write("Hello World");
+}
+
+proc main() {
+	printHello();
+}
+

@@ -61,6 +61,6 @@ String_View sv_chop_both(String_View s);
 char *unescape_string(char *s, size_t s_size);
 String_View unescape_string_to_sv(String_View s);
 char *sv_escape(String_View s);
-
+int64_t integer_from_sv(String_View s);
 
 #endif // STRING_VIEW_H

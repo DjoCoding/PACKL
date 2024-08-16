@@ -8,6 +8,12 @@ char *symbols[] = {
     ")",
     "{",
     "}",
+    "=",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
 };
 
 Token_Kind symbol_token_kinds[] = {
@@ -18,10 +24,17 @@ Token_Kind symbol_token_kinds[] = {
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
     TOKEN_KIND_CLOSE_CURLY_BRACE,
+    TOKEN_KIND_EQUAL,
+    TOKEN_KIND_PLUS,
+    TOKEN_KIND_MINUS,
+    TOKEN_KIND_STAR,
+    TOKEN_KIND_SLASH,
+    TOKEN_KIND_MOD,
 };
 
 char *keywords[] = {
     "proc",
+    "var",
 };
 
 char *natives[] = {
@@ -31,6 +44,7 @@ char *natives[] = {
 
 Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_PROC,
+    TOKEN_KIND_VAR,
 };
 
 char packl_lexer_peek(PACKL *self) {

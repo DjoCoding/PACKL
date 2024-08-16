@@ -18,6 +18,8 @@ void packl_destroy_node(Node node) {
         if (node.as.proc_def.params.size != 0) free(node.as.proc_def.params.items);        
         packl_destroy_ast(*node.as.proc_def.body);
         free(node.as.proc_def.body);
+    } else if (node.kind == NODE_KIND_VAR_DECLARATION) {
+        
     } else { ASSERT(false, "unreachable"); }
 }
 

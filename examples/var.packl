@@ -1,0 +1,4 @@
+proc main() {
+    var number: int = sub(1, 2, 3) + mul(1, 2) - "djaoued" / 2 + 2 - add(1, 2);
+    exit(number);
+}

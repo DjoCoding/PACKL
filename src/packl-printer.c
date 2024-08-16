@@ -15,14 +15,33 @@ char *token_kinds[] = {
     ")",
     "{",
     "}",
+    "=",
+    "+",
+    "-",
 
     "proc",
+    "var",
 };
 
+void packl_print_func_call(Func_Call func_call, size_t indent);
 void packl_print_ast_nodes(AST ast, size_t indent);
 
 void print_indent(size_t indent) {
     for (size_t i = 0; i < indent; ++i) { printf("  "); }
+}
+
+void packl_print_operator(Operator op, size_t indent) {
+    if (op == OP_PLUS) {
+        printf("+\n");
+    } else if (op == OP_MINUS) {
+        printf("-\n");
+    } else if (op == OP_MUL) {
+        printf("*\n");
+    } else if (op == OP_DIV) { 
+        printf("/\n");
+    } else if (op == OP_MOD) { 
+        printf("mod\n");
+    } else { ASSERT(false, "unreachable"); }
 }
 
 char *packl_token_kind_stringify(Token_Kind kind) {
@@ -30,7 +49,6 @@ char *packl_token_kind_stringify(Token_Kind kind) {
 } 
 
 void packl_print_token(Token tok) {
-    ASSERT(COUNT_TOKEN_KINDS == 6, "you added more token kinds probably, update the `packl_print_token` function");
     char *token_kind_str = packl_token_kind_stringify(tok.kind);
 
     printf("%s\t", token_kind_str);
@@ -44,18 +62,25 @@ void packl_print_tokens(Tokens toks) {
     }
 }
 
-void packl_print_func_call_arg(Func_Call_Arg arg, size_t indent) {
+void packl_print_expr(Expression expr, size_t indent) {
     print_indent(indent);
-    
-    if (arg.type == ARG_TYPE_STRING_LIT) {
-        printf("type: string");
-    } else if (arg.type == ARG_TYPE_INT_LIT) {
-        printf("type: integer");
-    } else if (arg.type == ARG_TYPE_ID) {
-        printf("type: identifer");
+    if (expr.kind == EXPR_KIND_STRING) {
+        printf("string: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
+    } else if (expr.kind == EXPR_KIND_INTEGER) {
+        printf("integer: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
+    } else if (expr.kind == EXPR_KIND_ID) {
+        printf("identifier: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
+    } else if (expr.kind == EXPR_KIND_FUNC_CALL) {
+        packl_print_func_call(*expr.as.func, indent);
+    } else if (expr.kind == EXPR_KIND_BIN_OP) {
+        packl_print_operator(expr.as.bin.op, indent + 1);
+        packl_print_expr(*expr.as.bin.lhs, indent + 2);
+        packl_print_expr(*expr.as.bin.rhs, indent + 2);
     } else { ASSERT(false, "unreachable"); }
+}
 
-    printf(", value: " SV_FMT "\n", SV_UNWRAP(arg.value));
+void packl_print_func_call_arg(Func_Call_Arg arg, size_t indent) {
+    packl_print_expr(arg.expr, indent);
 }
 
 void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
@@ -71,7 +96,6 @@ void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
 }
 
 void packl_print_func_call(Func_Call func_call, size_t indent) {
-    print_indent(indent);
     printf("func name: "SV_FMT"\n", SV_UNWRAP(func_call.name));
     print_indent(indent + 1);
     printf("args:\n");
@@ -113,6 +137,16 @@ void packl_print_proc_def(Proc_Def proc_def, size_t indent) {
     packl_print_body(*proc_def.body, indent + 1);
 }
 
+void packl_print_var_dec(Var_Declaration var_dec, size_t indent) {
+    print_indent(indent);
+    printf("variable name: " SV_FMT "\n", SV_UNWRAP(var_dec.name));
+
+    print_indent(indent);
+    printf("value:\n");
+
+    packl_print_expr(var_dec.value, indent + 1);
+}
+
 void packl_print_ast_node(Node node, size_t indent) {
     print_indent(indent);
 
@@ -125,6 +159,9 @@ void packl_print_ast_node(Node node, size_t indent) {
     } else if (node.kind == NODE_KIND_PROC_DEF){
         printf("node kind: procedure definition\n");
         packl_print_proc_def(node.as.proc_def, indent + 1);
+    } else if (node.kind == NODE_KIND_VAR_DECLARATION) {
+        printf("node kind: variable declaration:\n");
+        packl_print_var_dec(node.as.var_dec, indent + 1);
     } else { ASSERT(false, "unreachable"); }
 }
 

@@ -2,6 +2,7 @@
 
 char *context_item_as_cstr[] = {
     "procedure",
+    "variable",
 };
 
 Context packl_get_current_context(PACKL *self) {
@@ -26,7 +27,8 @@ void packl_pop_context(PACKL *self) {
 
 void packl_push_new_context(PACKL *self) {
     Context context = {0};
-    
+    context.stack_size = self->stack_size;
+
     DA_INIT(&context, sizeof(Context_Item));
     DA_APPEND(&self->contexts, context);
 }

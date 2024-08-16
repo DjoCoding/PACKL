@@ -31,6 +31,13 @@ typedef struct Parameters Parameters;
 // procedure defintion
 typedef struct Proc_Def Proc_Def;
 
+// expression
+typedef enum Operator Operator;
+typedef struct Expr_Bin_Op Expr_Bin_Op;
+typedef union Expr_As Expr_As;
+typedef enum Expr_Kind Expr_Kind;
+typedef struct Expression Expression;
+
 // function call 
 typedef enum Func_Call_Arg_Type Func_Call_Arg_Type;
 typedef union Func_Call_Arg_As Func_Call_Arg_As;
@@ -38,6 +45,10 @@ typedef struct Func_Call_Arg Func_Call_Arg;
 typedef struct Func_Call_Args Func_Call_Args;
 typedef struct Func_Call Func_Call;
 
+// variable declaration
+typedef struct Var_Declaration Var_Declaration;
+
+// Nodes 
 typedef enum Node_Kind Node_Kind;
 typedef union Node_As Node_As;
 typedef struct Node Node;
@@ -45,6 +56,7 @@ typedef struct Node Node;
 typedef struct AST AST;
 
 // Context 
+typedef struct Variable Variable;
 typedef struct Procedure Procedure;
 typedef enum Context_Item_Type Context_Item_Type;
 typedef union Context_Item_As Context_Item_As;
@@ -71,7 +83,16 @@ enum Token_Kind {
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
     TOKEN_KIND_CLOSE_CURLY_BRACE,
+    TOKEN_KIND_EQUAL,
+    TOKEN_KIND_PLUS,
+    TOKEN_KIND_MINUS,
+    TOKEN_KIND_STAR,
+    TOKEN_KIND_SLASH,
+    TOKEN_KIND_MOD,
+    
     TOKEN_KIND_PROC,
+    TOKEN_KIND_VAR,
+
 
     COUNT_TOKEN_KINDS,
 };
@@ -97,11 +118,51 @@ enum Node_Kind {
     NODE_KIND_FUNC_CALL = 0,
     NODE_KIND_NATIVE_CALL,
     NODE_KIND_PROC_DEF,
+    NODE_KIND_VAR_DECLARATION,
+    NODE_KIND_EXPR,
 };
+
+enum Expr_Kind {
+    EXPR_KIND_BIN_OP = 0,
+    EXPR_KIND_INTEGER,
+    EXPR_KIND_STRING,
+    EXPR_KIND_ID,
+    EXPR_KIND_FUNC_CALL,
+};
+
+enum Operator {
+    OP_PLUS = 0,
+    OP_MINUS,
+    OP_MUL,
+    OP_DIV,
+    OP_MOD,
+};  
+
+struct Expr_Bin_Op {
+    Expression *lhs, *rhs;
+    Operator op;
+};
+
+union Expr_As {
+    Expr_Bin_Op bin;
+    String_View value;
+    Func_Call *func;
+};
+
+struct Expression {
+    Expr_Kind kind;
+    Expr_As as;
+};  
 
 enum PACKL_Type {
     PACKL_TYPE_STRING = 0,
     PACKL_TYPE_INTEGER,
+};
+
+struct Var_Declaration {
+    String_View name;
+    String_View type;
+    Expression value;
 };
 
 struct Parameter {
@@ -121,15 +182,9 @@ struct Proc_Def {
     AST *body;
 };
 
-enum Func_Call_Arg_Type {
-    ARG_TYPE_STRING_LIT,
-    ARG_TYPE_INT_LIT,
-    ARG_TYPE_ID,
-};
 
 struct Func_Call_Arg {
-    Func_Call_Arg_Type type;
-    String_View value;
+    Expression expr;
 };
 
 struct Func_Call_Args {
@@ -146,6 +201,8 @@ struct Func_Call {
 union Node_As {
     Func_Call func_call;
     Proc_Def proc_def;
+    Var_Declaration var_dec;
+    Expression expr;
 };
 
 struct Node {
@@ -168,12 +225,19 @@ struct Procedure {
     size_t label_value;
 };
 
+struct Variable {
+    String_View type;
+    size_t stack_pos;  
+};
+
 enum Context_Item_Type {
     CONTEXT_ITEM_TYPE_PROCEDURE = 0,
+    CONTEXT_ITEM_TYPE_VARIABLE,
 };
 
 union Context_Item_As {
     Procedure proc;
+    Variable variable;
 };
 
 struct Context_Item {
@@ -186,6 +250,7 @@ struct Context {
     Context_Item *items;
     size_t count;
     size_t size;
+    size_t stack_size;
 };
 
 struct Contexts {
@@ -207,6 +272,7 @@ struct PACKL {
     Contexts contexts;
 
     size_t label_value;
+    size_t stack_size;
 };
 
 #endif

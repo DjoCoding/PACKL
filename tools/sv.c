@@ -401,3 +401,9 @@ String_Slices sv_get_lines(String_View s) {
 String_Slices sv_split(String_View s) {
     return sv_split_by_delim(s, isspace);
 }
+
+int64_t integer_from_sv(String_View s) {
+    int64_t number = 0;
+    sv_parse_integer(s, &number);
+    return number;
+}
