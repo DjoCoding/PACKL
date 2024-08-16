@@ -47,27 +47,27 @@ void packl_generate_pop(FILE *f, PACKL *self) {
 
 void packl_generate_add(FILE *f, PACKL *self) {
     fprintf(f, "add\n");
-    self->stack_size -= 2;
+    self->stack_size -= 1;
 }
 
 void packl_generate_sub(FILE *f, PACKL *self) {
     fprintf(f, "sub\n");
-    self->stack_size -= 2;
+    self->stack_size -= 1;
 }
 
 void packl_generate_mul(FILE *f, PACKL *self) {
     fprintf(f, "mul\n");
-    self->stack_size -= 2;
+    self->stack_size -= 1;
 }
 
 void packl_generate_div(FILE *f, PACKL *self) {
     fprintf(f, "div\n");
-    self->stack_size -= 2;
+    self->stack_size -= 1;
 }
 
 void packl_generate_mod(FILE *f, PACKL *self) {
     fprintf(f, "mod\n");
-    self->stack_size -= 2;
+    self->stack_size -= 1;
 }
 
 void packl_generate_swap(FILE *f, PACKL *self) {
@@ -99,7 +99,7 @@ void packl_generate_jmp(FILE *f, PACKL *self, size_t value) {
 
 void packl_generate_cmp(FILE *f, PACKL *self) {
     fprintf(f, "cmp\n");
-    self->stack_size -= 2;
+    self->stack_size -= 1;
 }
 
 void packl_generate_jz(FILE *f, PACKL *self, size_t value) {
@@ -133,7 +133,7 @@ void packl_generate_jg(FILE *f, PACKL *self, size_t value) {
 
 void packl_generate_putc(FILE *f, PACKL *self) {
     fprintf(f, "putc\n");
-    self->stack_size--;
+    self->stack_size--; // TODO: see if you can change this line, i think it's not correct
 }
 
 void packl_generate_call(FILE *f, PACKL *self, size_t value) {
@@ -183,15 +183,29 @@ void packl_generate_operation(FILE *f, PACKL *self, Operator op, size_t indent) 
     } else { ASSERT(false, "unreachable"); }
 }
 
+void packl_generate_variable_push_code(FILE *f, PACKL *self, String_View name, size_t indent) {
+    Context_Item *item = packl_get_context_item_in_all_contexts(self, name);
+    if (!item) { PACKL_ERROR(self->filename, "variable `" SV_FMT "` not defined yet", SV_UNWRAP(name)); }
+    
+    if (item->type == CONTEXT_ITEM_TYPE_PROCEDURE) {
+        PACKL_ERROR(self->filename, "expected `" SV_FMT "` to be a variable but found as a procedure", SV_UNWRAP(name));
+    }
+
+    fprint_indent(f, indent);
+    packl_generate_indup(f, self, self->stack_size - item->as.variable.stack_pos - 1);
+}
+
 void packl_generate_expression(FILE *f, PACKL *self, Expression expr, size_t indent) {
     if (expr.kind == EXPR_KIND_INTEGER) {
         fprint_indent(f, indent);
         packl_generate_push(f, self, integer_from_sv(expr.as.value));
+    } else if (expr.kind == EXPR_KIND_ID) {
+        packl_generate_variable_push_code(f, self, expr.as.value, indent);
     } else if (expr.kind == EXPR_KIND_BIN_OP) {
         packl_generate_expression(f, self, *expr.as.bin.lhs, indent);
         packl_generate_expression(f, self, *expr.as.bin.rhs, indent);
         packl_generate_operation(f, self, expr.as.bin.op, indent);
-    }
+    } else { TODO("not implemented yet, consider handling more primary types"); }
 }
 
 void packl_generate_write(FILE *f, PACKL *self, Expression expr, size_t indent) {

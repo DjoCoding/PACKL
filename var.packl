@@ -1,0 +1,5 @@
+proc main {
+    var first: int = 10 + 20 / 2 + 1 % 2;
+    var second: int = first + 20;
+    exit(second);
+}
