@@ -1,6 +1,15 @@
+proc foo() {
+    write("foo\n");
+}
+
+proc bar() {
+    write("bar\n");
+}
+
 proc main() {
     if (1) {
-        write("this is a one\n");
-    }
+        foo();
+    } 
+    bar();
     exit(0);
 }

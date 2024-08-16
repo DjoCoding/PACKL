@@ -10,6 +10,7 @@ size_t number_of_popped_values[] = {
     1,       // exit
 };
 
+void packl_generate_expr_code(FILE *f, PACKL *self, Expression expr, size_t indent);
 void packl_generate_statements_code(FILE *f, PACKL *self, AST ast, size_t indent);
 
 void fprint_indent(FILE *f, size_t indent) {
@@ -103,31 +104,31 @@ void packl_generate_cmp(FILE *f, PACKL *self) {
 }
 
 void packl_generate_jz(FILE *f, PACKL *self, size_t value) {
-    fprintf(f, "jz $label_%zu", value);
+    fprintf(f, "jz $label_%zu\n", value);
     self->stack_size--;
 }
 
 
 void packl_generate_jle(FILE *f, PACKL *self, size_t value) {
-    fprintf(f, "jle $label_%zu", value);
+    fprintf(f, "jle $label_%zu\n", value);
     self->stack_size--;
 }
 
 
 void packl_generate_jl(FILE *f, PACKL *self, size_t value) {
-    fprintf(f, "jl $label_%zu", value);
+    fprintf(f, "jl $label_%zu\n", value);
     self->stack_size--;
 }
 
 
 void packl_generate_jge(FILE *f, PACKL *self, size_t value) {
-    fprintf(f, "jge $label_%zu", value);
+    fprintf(f, "jge $label_%zu\n", value);
     self->stack_size--;
 }
 
 
 void packl_generate_jg(FILE *f, PACKL *self, size_t value) {
-    fprintf(f, "jg $label_%zu", value);
+    fprintf(f, "jg $label_%zu\n", value);
     self->stack_size--;
 }
 
@@ -168,19 +169,38 @@ void packl_generate_setc(FILE *f, PACKL *self) {
     self->stack_size--;
 }
 
+void packl_generate_body_code(FILE *f, PACKL *self, AST body, size_t indent) {
+    // push a new context for the if body
+    packl_push_new_context(self);
+    
+    // generate the code in that context 
+    packl_generate_statements_code(f, self, body, indent);
+
+    // pop the context added 
+    packl_pop_context(self);
+}
+
 void packl_generate_operation(FILE *f, PACKL *self, Operator op, size_t indent) {
     fprint_indent(f, indent);
-    if (op == OP_PLUS) {
-        packl_generate_add(f, self);
-    } else if (op == OP_MINUS) {
-        packl_generate_sub(f, self);
-    } else if (op == OP_MUL) {
-        packl_generate_mul(f, self);
-    } else if (op == OP_DIV) {
-        packl_generate_div(f, self);
-    } else if (op == OP_MOD) {
-        packl_generate_mod(f, self);
-    } else { ASSERT(false, "unreachable"); }
+    switch(op) {
+        case OP_PLUS:
+            packl_generate_add(f, self);            
+            break;
+        case OP_MINUS:
+            packl_generate_sub(f, self);            
+            break;
+        case OP_MUL:
+            packl_generate_mul(f, self);            
+            break;
+        case OP_DIV:
+            packl_generate_div(f, self);            
+            break;
+        case OP_MOD:
+            packl_generate_mod(f, self);            
+            break;
+        default:
+            ASSERT(false, "unreachable");
+    }
 }
 
 void packl_generate_variable_push_code(FILE *f, PACKL *self, String_View name, size_t indent) {
@@ -200,22 +220,40 @@ void packl_generate_variable_push_code(FILE *f, PACKL *self, String_View name, s
     }
 }
 
-void packl_generate_expression(FILE *f, PACKL *self, Expression expr, size_t indent) {
-    if (expr.kind == EXPR_KIND_INTEGER) {
-        fprint_indent(f, indent);
-        packl_generate_push(f, self, integer_from_sv(expr.as.value));
-    } else if (expr.kind == EXPR_KIND_STRING) {
-        fprint_indent(f, indent);
-        packl_generate_pushs(f, self, expr.as.value);
-        fprint_indent(f, indent);
-        packl_generate_push(f, self, (int64_t)expr.as.value.count);
-    } else if (expr.kind == EXPR_KIND_ID) {
-        packl_generate_variable_push_code(f, self, expr.as.value, indent);
-    } else if (expr.kind == EXPR_KIND_BIN_OP) {
-        packl_generate_expression(f, self, *expr.as.bin.lhs, indent);
-        packl_generate_expression(f, self, *expr.as.bin.rhs, indent);
-        packl_generate_operation(f, self, expr.as.bin.op, indent);
-    } else { TODO("not implemented yet, consider handling more primary types"); }
+void packl_generate_expr_push_int_code(FILE *f, PACKL *self, int64_t value, size_t indent) {
+    fprint_indent(f, indent);
+    packl_generate_push(f, self, value);    
+}
+
+void packl_generate_expr_push_string_code(FILE *f, PACKL *self,  String_View value, size_t indent) {
+    fprint_indent(f, indent);
+    packl_generate_pushs(f, self, value);
+    packl_generate_expr_push_int_code(f, self, (int64_t)value.count, indent);
+}
+
+void packl_generate_expr_bin_op_code(FILE *f, PACKL *self, Expr_Bin_Op bin, size_t indent) {
+    packl_generate_expr_code(f, self, *bin.lhs, indent);
+    packl_generate_expr_code(f, self, *bin.rhs, indent);
+    packl_generate_operation(f, self, bin.op, indent);
+}
+
+void packl_generate_expr_code(FILE *f, PACKL *self, Expression expr, size_t indent) {
+    switch(expr.kind) {
+        case EXPR_KIND_INTEGER:
+            packl_generate_expr_push_int_code(f, self, integer_from_sv(expr.as.value), indent);
+            break;
+        case EXPR_KIND_STRING:
+            packl_generate_expr_push_string_code(f, self, expr.as.value, indent);
+            break;
+        case EXPR_KIND_ID:
+            packl_generate_variable_push_code(f, self, expr.as.value, indent);
+            break;
+        case EXPR_KIND_BIN_OP:
+            packl_generate_expr_bin_op_code(f, self, expr.as.bin, indent);
+            break;
+        default:
+            TODO("not implemented yet, consider handling more primary types");
+    }
 }
 
 void packl_generate_write(FILE *f, PACKL *self, Expression expr, size_t indent) {
@@ -223,7 +261,7 @@ void packl_generate_write(FILE *f, PACKL *self, Expression expr, size_t indent) 
     fprint_indent(f, indent);
     packl_generate_push(f, self, 0);
 
-    packl_generate_expression(f, self, expr, indent);
+    packl_generate_expr_code(f, self, expr, indent);
     
     fprint_indent(f, indent);
     packl_generate_syscall(f, self, 0);
@@ -231,7 +269,7 @@ void packl_generate_write(FILE *f, PACKL *self, Expression expr, size_t indent) 
 
 
 void packl_generate_exit(FILE *f, PACKL *self, Expression expr, size_t indent) {
-    packl_generate_expression(f, self, expr, indent);
+    packl_generate_expr_code(f, self, expr, indent);
 
     fprint_indent(f, indent);
     packl_generate_syscall(f, self, 6);
@@ -293,14 +331,7 @@ void packl_generate_proc_def_code(FILE *f, PACKL *self, Proc_Def proc_def, size_
     fprint_indent(f, indent);
     packl_generate_label(f, self);
 
-    // push a new context for the procedure definition
-    packl_push_new_context(self);
-    
-    // generate the code in that context 
-    packl_generate_statements_code(f, self, *proc_def.body, indent + 1);
-
-    // pop the context added 
-    packl_pop_context(self);
+    packl_generate_body_code(f, self, *proc_def.body, indent + 1);
 
     fprint_indent(f, indent + 1);
     packl_generate_ret(f, self);
@@ -323,19 +354,45 @@ void packl_generate_var_dec_code(FILE *f, PACKL *self, Var_Declaration var_dec, 
     packl_push_item_in_current_context(self, item);
 
     // support for only integer variables
-    packl_generate_expression(f, self, var_dec.value, indent);
+    packl_generate_expr_code(f, self, var_dec.value, indent);
+}
+
+void packl_generate_if_code(FILE *f, PACKL *self, If_Statement fi, size_t indent) {
+    // evaluate the condition
+    packl_generate_expr_code(f, self, fi.condition, indent);
+    
+    fprint_indent(f, indent);
+    packl_generate_jz(f, self, self->label_value++); // incrementing the value of the labels just to handle the nested ifs 
+
+    // make the body code
+    packl_generate_body_code(f, self, *fi.body, indent);
+
+    // generate label for the after if block
+    self->label_value--;                            // remove the one added
+    packl_generate_label(f, self);
+    self->label_value--;                            // since one is added through the generate label function we have to remove it
 }
 
 void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t indent) {
-    if (node.kind == NODE_KIND_NATIVE_CALL) {
-        packl_generate_native_call_code(f, self, node.as.func_call, indent);
-    } else if (node.kind == NODE_KIND_FUNC_CALL) {
-        packl_generate_func_call_code(f, self, node.as.func_call, indent);
-    } else if (node.kind == NODE_KIND_PROC_DEF) {
-        packl_generate_proc_def_code(f, self, node.as.proc_def, indent);        
-    } else if (node.kind == NODE_KIND_VAR_DECLARATION) {
-        packl_generate_var_dec_code(f, self, node.as.var_dec, indent);
-    } else { ASSERT(false, "unreachable"); }
+    switch(node.kind) {
+        case NODE_KIND_NATIVE_CALL:
+            packl_generate_native_call_code(f, self, node.as.func_call, indent);
+            break;
+        case NODE_KIND_FUNC_CALL:
+            packl_generate_func_call_code(f, self, node.as.func_call, indent);
+            break;
+        case NODE_KIND_PROC_DEF:
+            packl_generate_proc_def_code(f, self, node.as.proc_def, indent);
+            break;
+        case NODE_KIND_VAR_DECLARATION:
+            packl_generate_var_dec_code(f, self, node.as.var_dec, indent);
+            break;
+        case NODE_KIND_IF:
+            packl_generate_if_code(f, self, node.as.fi, indent);
+            break;
+        default:
+            ASSERT(false, "unreachable");
+    }
 }
 
 void packl_generate_statements_code(FILE *f, PACKL *self, AST ast, size_t indent) {
