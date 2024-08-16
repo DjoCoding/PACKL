@@ -31,29 +31,6 @@ Expression packl_parser_parse_additive_expr(PACKL *self);
 Expression packl_parser_parse_expr(PACKL *self);
 Node packl_parser_parse_statement(PACKL *self);
 
-int packl_parser_get_prec(PACKL *self, Token_Kind kind) {
-    switch (kind) {
-        case TOKEN_KIND_PLUS:
-            return 2;
-        case TOKEN_KIND_MINUS:
-            return 2;
-        case TOKEN_KIND_STAR:
-            return 1;
-        case TOKEN_KIND_SLASH:
-            return 1;
-        case TOKEN_KIND_MOD:
-            return 1;
-        case TOKEN_KIND_IDENTIFIER:
-            return 0;
-        case TOKEN_KIND_STRING_LIT:
-            return 0;
-        case TOKEN_KIND_INTEGER_LIT:    
-            return 0;
-        default:
-            return -1;
-    }
-}
-
 Operator packl_get_operator(PACKL *self, Token_Kind kind) {
     if (kind == TOKEN_KIND_PLUS) { return OP_PLUS; }
     if (kind == TOKEN_KIND_MINUS) { return OP_MINUS; }

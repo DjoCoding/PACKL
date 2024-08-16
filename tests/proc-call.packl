@@ -1,0 +1,13 @@
+proc bar() {
+    var number: int = 20;
+    exit(number);
+}
+
+proc foo() {
+    var number: int = 10;
+    bar();
+}
+
+proc main() {
+    foo();
+}

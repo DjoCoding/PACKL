@@ -1,0 +1,4 @@
+proc main() {
+    var number: int = 10 * 21 + 1;
+    exit(1);
+}

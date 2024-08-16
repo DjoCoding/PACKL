@@ -1,0 +1,4 @@
+proc main() {
+    var variable: int = 1;
+    exit(variable);
+}
