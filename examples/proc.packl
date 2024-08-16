@@ -1,0 +1,13 @@
+proc bar() {
+    write("bar\n");
+}
+
+proc foo() {
+    write("foo\n");
+    bar();
+}
+
+proc main() {
+    foo();
+    exit(0);
+}

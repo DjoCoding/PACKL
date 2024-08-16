@@ -1,0 +1,10 @@
+proc foo() {
+    write("foo\n");
+}
+
+proc main() {
+    if (1) {
+        foo();
+    }
+    exit(0);
+}
