@@ -65,7 +65,7 @@ void packl_print_tokens(Tokens toks) {
 void packl_print_expr(Expression expr, size_t indent) {
     print_indent(indent);
     if (expr.kind == EXPR_KIND_STRING) {
-        printf("string: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
+        printf("string: \"" SV_FMT "\"\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_INTEGER) {
         printf("integer: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_ID) {
@@ -96,7 +96,9 @@ void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
 }
 
 void packl_print_func_call(Func_Call func_call, size_t indent) {
+    print_indent(indent);
     printf("func name: "SV_FMT"\n", SV_UNWRAP(func_call.name));
+
     print_indent(indent + 1);
     printf("args:\n");
     packl_print_func_call_args(func_call.args, indent + 2);
@@ -122,8 +124,8 @@ void packl_print_params(Parameters params, size_t indent) {
 
 void packl_print_body(AST body, size_t indent) {
     print_indent(indent);
-    printf("body: ");
-    packl_print_ast_nodes(body, indent + 1);
+    printf("body:");
+    packl_print_ast_nodes(body, indent + 2);
 }
 
 void packl_print_proc_def(Proc_Def proc_def, size_t indent) {
@@ -147,22 +149,63 @@ void packl_print_var_dec(Var_Declaration var_dec, size_t indent) {
     packl_print_expr(var_dec.value, indent + 1);
 }
 
-void packl_print_ast_node(Node node, size_t indent) {
+void packl_print_if(If_Statement fi, size_t indent) {
     print_indent(indent);
+    printf("condition:\n");
+    packl_print_expr(fi.condition, indent + 1);
+    packl_print_body(*fi.body, indent);
+}
 
-    if (node.kind == NODE_KIND_NATIVE_CALL) {
-        printf("node kind: native call\n");
-        packl_print_func_call(node.as.func_call, indent + 1);
-    } else if (node.kind == NODE_KIND_FUNC_CALL) {
-        printf("node kind: function call\n");
-        packl_print_func_call(node.as.func_call, indent + 1);
-    } else if (node.kind == NODE_KIND_PROC_DEF){
-        printf("node kind: procedure definition\n");
-        packl_print_proc_def(node.as.proc_def, indent + 1);
-    } else if (node.kind == NODE_KIND_VAR_DECLARATION) {
-        printf("node kind: variable declaration:\n");
-        packl_print_var_dec(node.as.var_dec, indent + 1);
-    } else { ASSERT(false, "unreachable"); }
+void packl_print_native_call_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: native call\n");
+    packl_print_func_call(node.as.func_call, indent + 1);
+}
+
+void packl_print_func_call_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: function call\n");
+    packl_print_func_call(node.as.func_call, indent + 1);
+}
+
+void packl_print_proc_def_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: procedure defintion\n");
+    packl_print_proc_def(node.as.proc_def, indent + 1);
+}
+
+void packl_print_var_dec_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: variable declaration\n");
+    packl_print_var_dec(node.as.var_dec, indent + 1);
+}
+
+void packl_print_if_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: if statement\n");
+    packl_print_if(node.as.fi, indent + 1);
+}
+
+void packl_print_ast_node(Node node, size_t indent) {
+    switch(node.kind) {
+        case NODE_KIND_NATIVE_CALL:
+            packl_print_native_call_node(node, indent);
+            break;
+        case NODE_KIND_FUNC_CALL:
+            packl_print_func_call_node(node, indent);
+            break;
+        case NODE_KIND_PROC_DEF:
+            packl_print_proc_def_node(node, indent);
+            break;
+        case NODE_KIND_VAR_DECLARATION:
+            packl_print_var_dec_node(node, indent);
+            break;
+        case NODE_KIND_IF:
+            packl_print_if_node(node, indent);
+            break;
+        default:
+            ASSERT(false, "unreachable");
+    }
 }
 
 void packl_print_ast_nodes(AST ast, size_t indent) {

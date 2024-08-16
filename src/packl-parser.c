@@ -312,38 +312,75 @@ Expression packl_parser_parse_expr(PACKL *self) {
     return packl_parser_parse_additive_expr(self);
 }
 
+Node packl_parser_parse_identifier(PACKL *self) {
+    Node node = {0};
+
+    if (packl_get_tokens_number(self) < 2) {
+        PACKL_ERROR(self->filename, "expected more tokens after " SV_FMT, SV_UNWRAP(ppeek(self).text));
+    }
+            
+    if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
+        node.kind = NODE_KIND_FUNC_CALL;
+        node.as.func_call = packl_parser_parse_func_call(self);
+        return node;
+    }
+
+    PACKL_ERROR(self->filename, "unexpected token found `" SV_FMT "`", SV_UNWRAP(ppeek(self).text));
+}
+
+Node packl_parser_parse_native_call(PACKL *self) {
+    Node node = {0};
+
+    if (packl_get_tokens_number(self) < 2) {
+        PACKL_ERROR(self->filename, "expected more tokens after " SV_FMT, SV_UNWRAP(ppeek(self).text));
+    }
+        
+    if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
+        node.kind = NODE_KIND_NATIVE_CALL;
+        node.as.func_call =  packl_parser_parse_func_call(self);
+        return node;
+    }
+
+    PACKL_ERROR(self->filename, "expected `(` after the native call " SV_FMT "\n", SV_UNWRAP(ppeek(self).text));
+}
+
+If_Statement packl_parser_parse_if_statement(PACKL *self) {
+    If_Statement fi = {0};
+
+    // consume the `if` token 
+    pexp(self, TOKEN_KIND_IF, NULL);
+
+    if (peot(self)) { PACKL_ERROR(self->filename, "expected `if` condition but end of tokend found"); }
+
+    if (ppeek(self).kind == TOKEN_KIND_OPEN_PARENT) {
+        padv(self);
+        fi.condition = packl_parser_parse_expr(self);
+        pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+    } else {
+        fi.condition = packl_parser_parse_expr(self);
+    }
+
+    pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, NULL);
+    fi.body = malloc(sizeof(AST));
+    *fi.body = packl_parser_parse_body(self);
+    pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, NULL);
+
+    return fi;
+}
+
 Node packl_parser_parse_statement(PACKL *self) {
     Node node = {0};
 
     Token_Kind kind = ppeek(self).kind;
 
     if (kind == TOKEN_KIND_NATIVE) {
-        if (packl_get_tokens_number(self) < 2) {
-            PACKL_ERROR(self->filename, "expected more tokens after " SV_FMT, SV_UNWRAP(ppeek(self).text));
-        }
-            
-        if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
-            node.kind = NODE_KIND_NATIVE_CALL;
-            node.as.func_call =  packl_parser_parse_func_call(self);
-            return node;
-        }
-
-        PACKL_ERROR(self->filename, "expected `(` after the native call " SV_FMT "\n", SV_UNWRAP(ppeek(self).text));
+        return packl_parser_parse_native_call(self);
     }
 
     if (kind == TOKEN_KIND_IDENTIFIER) {
-        if (packl_get_tokens_number(self) < 2) {
-            PACKL_ERROR(self->filename, "expected more tokens after " SV_FMT, SV_UNWRAP(ppeek(self).text));
-        }
-            
-        if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
-            node.kind = NODE_KIND_FUNC_CALL;
-            node.as.func_call = packl_parser_parse_func_call(self);
-            return node;
-        }
-
-        ASSERT(false, "unreachable");
+        return packl_parser_parse_identifier(self);
     }
+
 
     if (kind == TOKEN_KIND_PROC) {
         node.kind = NODE_KIND_PROC_DEF;
@@ -354,6 +391,12 @@ Node packl_parser_parse_statement(PACKL *self) {
     if (kind == TOKEN_KIND_VAR) {
         node.kind = NODE_KIND_VAR_DECLARATION;
         node.as.var_dec = packl_parser_parse_var_dec(self);
+        return node;
+    }
+
+    if (kind == TOKEN_KIND_IF) {
+        node.kind = NODE_KIND_IF;
+        node.as.fi = packl_parser_parse_if_statement(self);
         return node;
     }
 

@@ -35,6 +35,7 @@ Token_Kind symbol_token_kinds[] = {
 char *keywords[] = {
     "proc",
     "var",
+    "if",
 };
 
 char *natives[] = {
@@ -45,6 +46,7 @@ char *natives[] = {
 Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_PROC,
     TOKEN_KIND_VAR,
+    TOKEN_KIND_IF,
 };
 
 char packl_lexer_peek(PACKL *self) {

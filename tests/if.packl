@@ -1,0 +1,6 @@
+proc main() {
+    if (1) {
+        write("this is a one\n");
+    }
+    exit(0);
+}

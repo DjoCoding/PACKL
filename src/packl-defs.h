@@ -38,6 +38,9 @@ typedef union Expr_As Expr_As;
 typedef enum Expr_Kind Expr_Kind;
 typedef struct Expression Expression;
 
+// If Statement
+typedef struct If_Statement If_Statement;
+
 // function call 
 typedef enum Func_Call_Arg_Type Func_Call_Arg_Type;
 typedef union Func_Call_Arg_As Func_Call_Arg_As;
@@ -92,6 +95,7 @@ enum Token_Kind {
     
     TOKEN_KIND_PROC,
     TOKEN_KIND_VAR,
+    TOKEN_KIND_IF,
 
 
     COUNT_TOKEN_KINDS,
@@ -120,6 +124,7 @@ enum Node_Kind {
     NODE_KIND_PROC_DEF,
     NODE_KIND_VAR_DECLARATION,
     NODE_KIND_EXPR,
+    NODE_KIND_IF,
 };
 
 enum Expr_Kind {
@@ -153,6 +158,11 @@ struct Expression {
     Expr_Kind kind;
     Expr_As as;
 };  
+
+struct If_Statement {
+    Expression condition;
+    AST *body;
+};
 
 enum PACKL_Type {
     PACKL_TYPE_STRING = 0,
@@ -203,6 +213,7 @@ union Node_As {
     Proc_Def proc_def;
     Var_Declaration var_dec;
     Expression expr;
+    If_Statement fi;
 };
 
 struct Node {
