@@ -1,0 +1,5 @@
+proc main() {
+    var s: str = "string\n";
+    write(s);
+    exit(0);
+}

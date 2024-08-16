@@ -28,7 +28,7 @@ void packl_generate_push(FILE *f, PACKL *self, int64_t value) {
 }
 
 void packl_generate_pushs(FILE *f, PACKL *self, String_View value) {
-    fprintf(f, "pushs " SV_FMT "\n", SV_UNWRAP(value));
+    fprintf(f, "pushs \"" SV_FMT "\"\n", SV_UNWRAP(value));
     self->stack_size++;    
 }
 
@@ -193,12 +193,22 @@ void packl_generate_variable_push_code(FILE *f, PACKL *self, String_View name, s
 
     fprint_indent(f, indent);
     packl_generate_indup(f, self, self->stack_size - item->as.variable.stack_pos - 1);
+    
+    if (sv_eq(item->as.variable.type, SV("str"))) {
+        fprint_indent(f, indent);
+        packl_generate_indup(f, self, self->stack_size - item->as.variable.stack_pos - 2);
+    }
 }
 
 void packl_generate_expression(FILE *f, PACKL *self, Expression expr, size_t indent) {
     if (expr.kind == EXPR_KIND_INTEGER) {
         fprint_indent(f, indent);
         packl_generate_push(f, self, integer_from_sv(expr.as.value));
+    } else if (expr.kind == EXPR_KIND_STRING) {
+        fprint_indent(f, indent);
+        packl_generate_pushs(f, self, expr.as.value);
+        fprint_indent(f, indent);
+        packl_generate_push(f, self, (int64_t)expr.as.value.count);
     } else if (expr.kind == EXPR_KIND_ID) {
         packl_generate_variable_push_code(f, self, expr.as.value, indent);
     } else if (expr.kind == EXPR_KIND_BIN_OP) {
@@ -209,25 +219,16 @@ void packl_generate_expression(FILE *f, PACKL *self, Expression expr, size_t ind
 }
 
 void packl_generate_write(FILE *f, PACKL *self, Expression expr, size_t indent) {
-    (void)f;
-    (void)self;
-    (void)expr;
-    (void)indent;
-    TODO("write function code generation not implemented yet");
+    // push the stdout for the moment
+    fprint_indent(f, indent);
+    packl_generate_push(f, self, 0);
 
-    // // push the stdout for the moment
-    // fprint_indent(f, indent);
-    // packl_generate_push(f, self, 0);
-
-    // fprint_indent(f, indent);
-    // packl_generate_pushs(f, self, view);
+    packl_generate_expression(f, self, expr, indent);
     
-    // fprint_indent(f, indent);
-    // packl_generate_push(f, self, (int64_t)view.count);
-    
-    // fprint_indent(f, indent);
-    // packl_generate_syscall(f, self, 0);
+    fprint_indent(f, indent);
+    packl_generate_syscall(f, self, 0);
 }
+
 
 void packl_generate_exit(FILE *f, PACKL *self, Expression expr, size_t indent) {
     packl_generate_expression(f, self, expr, indent);
