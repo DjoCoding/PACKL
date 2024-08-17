@@ -398,6 +398,37 @@ void packl_generate_if_code(FILE *f, PACKL *self, If_Statement fi, size_t indent
     packl_generate_label(f, label + 1);
 }
 
+void packl_generate_while_code(FILE *f, PACKL *self, While_Statement hwile, size_t indent) {
+    size_t label = self->label_value;
+    self->label_value += 3;                // we need three labels for the while code generation
+
+    // make a label for the loop
+    packl_generate_label(f, label);
+
+    // evaluate the expression
+    packl_generate_expr_code(f, self, hwile.condition, indent);
+
+    // handle the cases
+    fprint_indent(f, indent);
+    packl_generate_jz(f, self, label + 1);  // if the condition is false
+    
+    fprint_indent(f, indent);
+    packl_generate_jmp(f, self, label + 2); // if the condition is true
+
+    // generate the labels 
+    
+    // for the while body
+    packl_generate_label(f, label + 2); 
+    packl_generate_body_code(f, self, *hwile.body, indent);
+
+    // make a jump to initial while label
+    fprint_indent(f, indent);
+    packl_generate_jmp(f, self, label);  
+
+    // to exit from the while loop
+    packl_generate_label(f, label + 1);
+}
+
 
 void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t indent) {
     switch(node.kind) {
@@ -415,6 +446,9 @@ void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t inden
             break;
         case NODE_KIND_IF:
             packl_generate_if_code(f, self, node.as.fi, indent);
+            break;
+        case NODE_KIND_WHILE: 
+            packl_generate_while_code(f, self, node.as.hwile, indent);
             break;
         default:
             ASSERT(false, "unreachable");

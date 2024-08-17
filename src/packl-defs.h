@@ -38,6 +38,9 @@ typedef union Expr_As Expr_As;
 typedef enum Expr_Kind Expr_Kind;
 typedef struct Expression Expression;
 
+// While Statement
+typedef struct While_Statement While_Statement;
+
 // If Statement
 typedef struct If_Statement If_Statement;
 
@@ -97,6 +100,7 @@ enum Token_Kind {
     TOKEN_KIND_VAR,
     TOKEN_KIND_IF,
     TOKEN_KIND_ELSE,
+    TOKEN_KIND_WHILE,
 
     TOKEN_KIND_END,
 
@@ -128,6 +132,7 @@ enum Node_Kind {
     NODE_KIND_VAR_DECLARATION,
     NODE_KIND_EXPR,
     NODE_KIND_IF,
+    NODE_KIND_WHILE,
 };
 
 enum Expr_Kind {
@@ -161,6 +166,11 @@ struct Expression {
     Expr_Kind kind;
     Expr_As as;
 };  
+
+struct While_Statement {
+    Expression condition;
+    AST *body;
+};
 
 struct If_Statement {
     Expression condition;
@@ -218,6 +228,7 @@ union Node_As {
     Var_Declaration var_dec;
     Expression expr;
     If_Statement fi;
+    While_Statement hwile;
 };
 
 struct Node {

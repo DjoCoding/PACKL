@@ -24,6 +24,9 @@ char *token_kinds_str[] = {
 
     "proc",
     "var",
+    "if",
+    "else",
+    "while",
 };
 
 
@@ -390,6 +393,32 @@ If_Statement packl_parser_parse_if_statement(PACKL *self) {
     return fi;
 }
 
+While_Statement packl_parser_parse_while_statement(PACKL *self) {
+    While_Statement hwile = {0};
+
+    // consume the `while` token 
+    pexp(self, TOKEN_KIND_WHILE, NULL);
+
+    if (peot(self)) { PACKL_ERROR(self->filename, "expected `while` condition but end found"); }
+
+    if (ppeek(self).kind == TOKEN_KIND_OPEN_PARENT) {
+        padv(self);
+        hwile.condition = packl_parser_parse_expr(self);
+        pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+        pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, NULL);
+    } else {
+        hwile.condition = packl_parser_parse_expr(self);
+    }
+
+    hwile.body = malloc(sizeof(AST));
+    *hwile.body = packl_parser_parse_body(self);
+    pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, NULL);
+
+    if (peot(self)) { PACKL_ERROR(self->filename, "expected more tokens but end found"); }
+
+    return hwile;
+}
+
 Node packl_parser_parse_statement(PACKL *self) {
     Node node = {0};
 
@@ -419,6 +448,12 @@ Node packl_parser_parse_statement(PACKL *self) {
     if (kind == TOKEN_KIND_IF) {
         node.kind = NODE_KIND_IF;
         node.as.fi = packl_parser_parse_if_statement(self);
+        return node;
+    }
+
+    if (kind == TOKEN_KIND_WHILE) {
+        node.kind = NODE_KIND_WHILE;   
+        node.as.hwile = packl_parser_parse_while_statement(self);
         return node;
     }
 

@@ -26,6 +26,7 @@ char *token_kinds[] = {
     "var",
     "if",
     "else",
+    "while",
 };
 
 void packl_print_func_call(Func_Call func_call, size_t indent);
@@ -202,6 +203,12 @@ void packl_print_if_node(Node node, size_t indent) {
     packl_print_if(node.as.fi, indent + 1);
 }
 
+void packl_print_while_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: while statement\n");
+    packl_print_if(node.as.fi, indent + 1);
+}
+
 void packl_print_ast_node(Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -218,6 +225,9 @@ void packl_print_ast_node(Node node, size_t indent) {
             break;
         case NODE_KIND_IF:
             packl_print_if_node(node, indent);
+            break;
+        case NODE_KIND_WHILE:
+            packl_print_while_node(node, indent);
             break;
         default:
             ASSERT(false, "unreachable");

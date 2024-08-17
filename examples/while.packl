@@ -1,0 +1,6 @@
+proc main() {
+	while(1) {
+		write("Hello World\n");	
+	}
+	exit(0);
+}

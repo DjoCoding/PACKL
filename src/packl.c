@@ -54,6 +54,13 @@ void packl_destroy_if(If_Statement fi) {
     if(fi.esle) { packl_destroy_ast(*fi.esle); free(fi.esle); }
 }
 
+void packl_destroy_while(While_Statement hwile) {
+    packl_destroy_expr(hwile.condition);
+
+    packl_destroy_ast(*hwile.body);
+    free(hwile.body);
+}
+
 void packl_destroy_node(Node node) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -70,6 +77,9 @@ void packl_destroy_node(Node node) {
             break;
         case NODE_KIND_IF:
             packl_destroy_if(node.as.fi);
+            break;
+        case NODE_KIND_WHILE:
+            packl_destroy_while(node.as.hwile);
             break;
         default:
             ASSERT(false, "unreachable");
