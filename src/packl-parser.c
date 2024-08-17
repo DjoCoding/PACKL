@@ -21,6 +21,8 @@ char *token_kinds_str[] = {
     "*",
     "/",
     "%",
+    "<",
+    ">",
 
     "proc",
     "var",
@@ -33,7 +35,7 @@ Node packl_init_node(Node_Kind kind, Location loc) {
     return (Node) { .kind = kind, .loc = loc };
 }
 
-Expression packl_parser_parse_additive_expr(PACKL *self);
+Expression packl_parser_parse_comparative_expr(PACKL *self);
 Expression packl_parser_parse_expr(PACKL *self);
 Node packl_parser_parse_statement(PACKL *self);
 
@@ -55,12 +57,24 @@ bool packl_parser_eot(PACKL *self) {
 }
 
 Operator packl_get_operator(PACKL *self, Token token) {
-    if (token.kind == TOKEN_KIND_PLUS) { return OP_PLUS; }
-    if (token.kind == TOKEN_KIND_MINUS) { return OP_MINUS; }
-    if (token.kind == TOKEN_KIND_STAR) { return OP_MUL; }
-    if (token.kind == TOKEN_KIND_SLASH) { return OP_DIV; }
-    if (token.kind == TOKEN_KIND_MOD) { return OP_MOD; }
-    PACKL_ERROR_LOC(self->filename, token.loc, "expected operator type but `" SV_FMT "` found", SV_UNWRAP(ppeek(self).text));
+    switch(token.kind) {
+        case TOKEN_KIND_PLUS:
+            return OP_PLUS;
+        case TOKEN_KIND_MINUS:
+            return OP_MINUS;
+        case TOKEN_KIND_STAR:
+            return OP_MUL;
+        case TOKEN_KIND_SLASH:
+            return OP_DIV;
+        case TOKEN_KIND_MOD:
+            return OP_MOD;
+        case TOKEN_KIND_LESS:
+            return OP_LESS;
+        case TOKEN_KIND_GREATER:
+            return OP_GREATER;
+        default:
+            PACKL_ERROR_LOC(self->filename, token.loc, "expected operator type but `" SV_FMT "` found", SV_UNWRAP(ppeek(self).text));
+    }
 }
 
 void packl_parser_expect(PACKL *self, Token_Kind kind, Token *token) {
@@ -241,11 +255,43 @@ Expression get_func_call_expr(Func_Call func) {
 }
 
 int ismultiplicative(Token_Kind kind) {
-    return (kind == TOKEN_KIND_STAR || kind == TOKEN_KIND_SLASH || kind == TOKEN_KIND_MOD);
+    Token_Kind kinds[] = {
+        TOKEN_KIND_STAR,
+        TOKEN_KIND_SLASH,
+        TOKEN_KIND_MOD,
+    };
+
+    for (size_t i = 0; i < ARR_SIZE(kinds); ++i) {
+        if (kinds[i] == kind) { return true; }
+    }
+
+    return false;
 }
 
 int isadditive(Token_Kind kind) {
-    return (kind == TOKEN_KIND_PLUS || kind == TOKEN_KIND_MINUS);
+    Token_Kind kinds[] = {
+        TOKEN_KIND_PLUS,
+        TOKEN_KIND_MINUS,
+    };
+
+    for (size_t i = 0; i < ARR_SIZE(kinds); ++i) {
+        if (kinds[i] == kind) { return true; }
+    }
+
+    return false;
+}
+
+int iscomparative(Token_Kind kind) {
+    Token_Kind kinds[] = {
+        TOKEN_KIND_LESS,
+        TOKEN_KIND_GREATER,
+    };
+
+    for (size_t i = 0; i < ARR_SIZE(kinds); ++i) {
+        if (kinds[i] == kind) { return true; }
+    }
+
+    return false;
 }
 
 Expression packl_parser_parse_primary_expr(PACKL *self) {
@@ -277,7 +323,7 @@ Expression packl_parser_parse_primary_expr(PACKL *self) {
 
     if (token.kind == TOKEN_KIND_OPEN_PARENT) {
         padv(self);
-        Expression expr = packl_parser_parse_additive_expr(self);
+        Expression expr = packl_parser_parse_comparative_expr(self);
         pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
         return expr;
     }
@@ -325,8 +371,28 @@ Expression packl_parser_parse_additive_expr(PACKL *self) {
     return lhs;
 }
 
+Expression packl_parser_parse_comparative_expr(PACKL *self) {
+    Expression lhs = packl_parser_parse_additive_expr(self);
+
+    while (!peot(self)) {
+        Token token = ppeek(self);
+        if (!iscomparative(token.kind)) { break; }
+
+        Operator op = packl_get_operator(self, token);
+        padv(self);
+
+        Expression rhs = packl_parser_parse_additive_expr(self);
+
+        Expression bin = get_bin_operation(lhs, rhs, op);
+
+        lhs = bin;
+    }
+
+    return lhs;
+}
+
 Expression packl_parser_parse_expr(PACKL *self) {
-    return packl_parser_parse_additive_expr(self);
+    return packl_parser_parse_comparative_expr(self);
 }
 
 Var_Reassign packl_parser_parse_var_reassign(PACKL *self) {

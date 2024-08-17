@@ -37,17 +37,31 @@ void print_indent(size_t indent) {
 }
 
 void packl_print_operator(Operator op, size_t indent) {
-    if (op == OP_PLUS) {
-        printf("+\n");
-    } else if (op == OP_MINUS) {
-        printf("-\n");
-    } else if (op == OP_MUL) {
-        printf("*\n");
-    } else if (op == OP_DIV) { 
-        printf("/\n");
-    } else if (op == OP_MOD) { 
-        printf("mod\n");
-    } else { ASSERT(false, "unreachable"); }
+    switch(op) {
+        case OP_PLUS:
+            printf("+\n");
+            break;
+        case OP_MINUS:
+            printf("-\n");
+            break;
+        case OP_MUL:
+            printf("*\n");
+            break;
+        case OP_DIV: 
+            printf("/\n");
+            break;
+        case OP_MOD: 
+            printf("mod\n");
+            break;
+        case OP_LESS:
+            printf("<\n");
+            break;
+        case OP_GREATER:
+            printf(">\n");
+            break;
+        default:
+            ASSERT(false, "unreachable"); 
+    }
 }
 
 char *packl_token_kind_stringify(Token_Kind kind) {
@@ -69,16 +83,19 @@ void packl_print_tokens(Tokens toks) {
 }
 
 void packl_print_expr(Expression expr, size_t indent) {
-    print_indent(indent);
     if (expr.kind == EXPR_KIND_STRING) {
+        print_indent(indent);
         printf("string: \"" SV_FMT "\"\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_INTEGER) {
+        print_indent(indent);
         printf("integer: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_ID) {
+        print_indent(indent);
         printf("identifier: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_FUNC_CALL) {
         packl_print_func_call(*expr.as.func, indent);
     } else if (expr.kind == EXPR_KIND_BIN_OP) {
+        print_indent(indent);
         packl_print_operator(expr.as.bin.op, indent + 1);
         packl_print_expr(*expr.as.bin.lhs, indent + 2);
         packl_print_expr(*expr.as.bin.rhs, indent + 2);
@@ -102,6 +119,7 @@ void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
 }
 
 void packl_print_func_call(Func_Call func_call, size_t indent) {
+    print_indent(indent);
     printf("func name: "SV_FMT"\n", SV_UNWRAP(func_call.name));
 
     print_indent(indent + 1);
@@ -194,6 +212,7 @@ void packl_print_var_reassign(Var_Reassign var, size_t indent) {
 void packl_print_native_call_node(Node node, size_t indent) {
     print_indent(indent);
     printf("node kind: native call\n");
+
     packl_print_func_call(node.as.func_call, indent + 1);
 }
 

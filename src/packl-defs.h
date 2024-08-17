@@ -98,6 +98,8 @@ enum Token_Kind {
     TOKEN_KIND_STAR,
     TOKEN_KIND_SLASH,
     TOKEN_KIND_MOD,
+    TOKEN_KIND_LESS,
+    TOKEN_KIND_GREATER,
     
     TOKEN_KIND_PROC,
     TOKEN_KIND_VAR,
@@ -154,6 +156,8 @@ enum Operator {
     OP_MUL,
     OP_DIV,
     OP_MOD,
+    OP_LESS,
+    OP_GREATER,
 };  
 
 struct Expr_Bin_Op {

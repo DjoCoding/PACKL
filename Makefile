@@ -7,13 +7,13 @@ OBJDIR = obj
 TOOLSDIR = tools
 BIN = bin
 
-ENTRY = pc.c
+ENTRY = packlc.c
 
 SOURCES = $(ENTRY) $(wildcard $(TOOLSDIR)/*.c)  $(wildcard $(SRCDIR)/*.c)
 
 OBJECTS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES))
 
-EXEC = pc
+EXEC = packlc
 
 all: $(EXEC)
 

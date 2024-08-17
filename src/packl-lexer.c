@@ -14,6 +14,8 @@ char *symbols[] = {
     "*",
     "/",
     "%",
+    "<",
+    ">",
 };
 
 Token_Kind symbol_token_kinds[] = {
@@ -30,6 +32,8 @@ Token_Kind symbol_token_kinds[] = {
     TOKEN_KIND_STAR,
     TOKEN_KIND_SLASH,
     TOKEN_KIND_MOD,
+    TOKEN_KIND_LESS,
+    TOKEN_KIND_GREATER,
 };
 
 char *keywords[] = {

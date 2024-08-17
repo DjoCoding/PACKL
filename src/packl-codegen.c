@@ -66,6 +66,16 @@ void packl_generate_div(FILE *f, PACKL *self) {
     self->stack_size -= 1;
 }
 
+void packl_generate_cmpl(FILE *f, PACKL *self) {
+    fprintf(f, "cmpl\n");
+    self->stack_size -= 1;
+}
+
+void packl_generate_cmpg(FILE *f, PACKL *self) {
+    fprintf(f, "cmpg\n");
+    self->stack_size -= 1;
+}
+
 void packl_generate_mod(FILE *f, PACKL *self) {
     fprintf(f, "mod\n");
     self->stack_size -= 1;
@@ -197,6 +207,12 @@ void packl_generate_operation(FILE *f, PACKL *self, Operator op, size_t indent) 
             break;
         case OP_MOD:
             packl_generate_mod(f, self);            
+            break;
+        case OP_LESS:
+            packl_generate_cmpl(f, self);
+            break;
+        case OP_GREATER:
+            packl_generate_cmpg(f, self);
             break;
         default:
             ASSERT(false, "unreachable");
