@@ -275,6 +275,13 @@ Expression packl_parser_parse_primary_expr(PACKL *self) {
         return (Expression) { .kind = EXPR_KIND_ID, .as.value = token.text };
     }
 
+    if (token.kind == TOKEN_KIND_OPEN_PARENT) {
+        padv(self);
+        Expression expr = packl_parser_parse_additive_expr(self);
+        pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+        return expr;
+    }
+
     PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found when parsing expression `" SV_FMT "`", SV_UNWRAP(token.text));
 }
 
@@ -288,7 +295,7 @@ Expression packl_parser_parse_multiplicative_expr(PACKL *self) {
         Operator op = packl_get_operator(self, token);
         padv(self);
 
-        Expression rhs = packl_parser_parse_multiplicative_expr(self);
+        Expression rhs = packl_parser_parse_primary_expr(self);
 
         Expression bin = get_bin_operation(lhs, rhs, op);
 
@@ -308,7 +315,7 @@ Expression packl_parser_parse_additive_expr(PACKL *self) {
         Operator op = packl_get_operator(self, token);
         padv(self);
 
-        Expression rhs = packl_parser_parse_additive_expr(self);
+        Expression rhs = packl_parser_parse_multiplicative_expr(self);
 
         Expression bin = get_bin_operation(lhs, rhs, op);
 

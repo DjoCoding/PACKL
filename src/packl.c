@@ -36,8 +36,8 @@ void packl_destroy_func_call(Func_Call call) {
 }
 
 void packl_destroy_proc_def(Proc_Def proc) {
-    free(proc.params.items);
     packl_destroy_ast(*proc.body);
+    free(proc.params.items);
     free(proc.body);
 }
 

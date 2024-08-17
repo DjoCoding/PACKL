@@ -102,7 +102,6 @@ void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
 }
 
 void packl_print_func_call(Func_Call func_call, size_t indent) {
-    print_indent(indent);
     printf("func name: "SV_FMT"\n", SV_UNWRAP(func_call.name));
 
     print_indent(indent + 1);
