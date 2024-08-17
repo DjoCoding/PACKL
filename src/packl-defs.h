@@ -54,6 +54,9 @@ typedef struct Func_Call Func_Call;
 // variable declaration
 typedef struct Var_Declaration Var_Declaration;
 
+// variable reassignement
+typedef struct Var_Reassign Var_Reassign;
+
 // Nodes 
 typedef enum Node_Kind Node_Kind;
 typedef union Node_As Node_As;
@@ -133,6 +136,7 @@ enum Node_Kind {
     NODE_KIND_EXPR,
     NODE_KIND_IF,
     NODE_KIND_WHILE,
+    NODE_KIND_VAR_REASSIGN,
 };
 
 enum Expr_Kind {
@@ -166,6 +170,11 @@ struct Expression {
     Expr_Kind kind;
     Expr_As as;
 };  
+
+struct Var_Reassign {
+    String_View name;
+    Expression expr;
+};
 
 struct While_Statement {
     Expression condition;
@@ -229,6 +238,7 @@ union Node_As {
     Expression expr;
     If_Statement fi;
     While_Statement hwile;
+    Var_Reassign var;
 };
 
 struct Node {

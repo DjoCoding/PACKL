@@ -429,6 +429,23 @@ void packl_generate_while_code(FILE *f, PACKL *self, While_Statement hwile, size
     packl_generate_label(f, label + 1);
 }
 
+void packl_generate_var_reassign_code(FILE *f, PACKL *self, Var_Reassign var, size_t indent) {
+    Context_Item *item = packl_get_context_item_in_all_contexts(self, var.name);
+    if (!item) { PACKL_ERROR(self->filename, "variable `" SV_FMT "` not defined yet", SV_UNWRAP(var.name)); }
+    
+    if (item->type == CONTEXT_ITEM_TYPE_PROCEDURE) {
+        PACKL_ERROR(self->filename, "expected `" SV_FMT "` to be a variable but found as a procedure", SV_UNWRAP(var.name));
+    }
+
+    packl_generate_expr_code(f, self, var.expr, indent);
+
+    fprint_indent(f, indent);
+    packl_generate_inswap(f, self, self->stack_size - item->as.variable.stack_pos - 1);
+
+    fprint_indent(f, indent);
+    packl_generate_pop(f, self);
+}
+
 
 void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t indent) {
     switch(node.kind) {
@@ -449,6 +466,9 @@ void packl_generate_statement_code(FILE *f, PACKL *self, Node node, size_t inden
             break;
         case NODE_KIND_WHILE: 
             packl_generate_while_code(f, self, node.as.hwile, indent);
+            break;
+        case NODE_KIND_VAR_REASSIGN:
+            packl_generate_var_reassign_code(f, self, node.as.var, indent);
             break;
         default:
             ASSERT(false, "unreachable");

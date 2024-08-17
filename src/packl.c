@@ -61,6 +61,10 @@ void packl_destroy_while(While_Statement hwile) {
     free(hwile.body);
 }
 
+void packl_destroy_var_reassign(Var_Reassign var) {
+    packl_destroy_expr(var.expr);
+}
+
 void packl_destroy_node(Node node) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -80,6 +84,9 @@ void packl_destroy_node(Node node) {
             break;
         case NODE_KIND_WHILE:
             packl_destroy_while(node.as.hwile);
+            break;
+        case NODE_KIND_VAR_REASSIGN:
+            packl_destroy_var_reassign(node.as.var);
             break;
         default:
             ASSERT(false, "unreachable");

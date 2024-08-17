@@ -150,6 +150,9 @@ void packl_print_var_dec(Var_Declaration var_dec, size_t indent) {
     printf("variable name: " SV_FMT "\n", SV_UNWRAP(var_dec.name));
 
     print_indent(indent);
+    printf("variable type: " SV_FMT "\n", SV_UNWRAP(var_dec.type));
+
+    print_indent(indent);
     printf("value:\n");
 
     packl_print_expr(var_dec.value, indent + 1);
@@ -171,6 +174,22 @@ void packl_print_if(If_Statement fi, size_t indent) {
     if (fi.esle) {
         packl_print_else(*fi.esle, indent);
     }
+}
+
+void packl_print_while(While_Statement hwile, size_t indent) {
+    print_indent(indent);
+    printf("condition:\n");
+    packl_print_expr(hwile.condition, indent + 1);
+    packl_print_body(*hwile.body, indent);
+}
+
+void packl_print_var_reassign(Var_Reassign var, size_t indent) {
+    print_indent(indent);
+    printf("variable name: " SV_FMT "\n", SV_UNWRAP(var.name));
+
+    print_indent(indent);
+    printf("value:\n");
+    packl_print_expr(var.expr, indent + 1);
 }
 
 void packl_print_native_call_node(Node node, size_t indent) {
@@ -206,7 +225,13 @@ void packl_print_if_node(Node node, size_t indent) {
 void packl_print_while_node(Node node, size_t indent) {
     print_indent(indent);
     printf("node kind: while statement\n");
-    packl_print_if(node.as.fi, indent + 1);
+    packl_print_while(node.as.hwile, indent + 1);
+}
+
+void packl_print_var_reassign_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: variable reassignement\n");
+    packl_print_var_reassign(node.as.var, indent + 1);
 }
 
 void packl_print_ast_node(Node node, size_t indent) {
@@ -228,6 +253,9 @@ void packl_print_ast_node(Node node, size_t indent) {
             break;
         case NODE_KIND_WHILE:
             packl_print_while_node(node, indent);
+            break;
+        case NODE_KIND_VAR_REASSIGN:
+            packl_print_var_reassign_node(node, indent);
             break;
         default:
             ASSERT(false, "unreachable");

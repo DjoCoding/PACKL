@@ -1,6 +1,10 @@
 proc main() {
-	while(1) {
+	var i: int = 10;
+
+	while(i) {
 		write("Hello World\n");	
+		i = i - 1;
 	}
+	
 	exit(0);
 }

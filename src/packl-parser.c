@@ -315,6 +315,20 @@ Expression packl_parser_parse_expr(PACKL *self) {
     return packl_parser_parse_additive_expr(self);
 }
 
+Var_Reassign packl_parser_parse_var_reassign(PACKL *self) {
+    Var_Reassign var = {0};
+
+    Token token = {0};
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    var.name = token.text;
+
+    pexp(self, TOKEN_KIND_EQUAL, NULL);
+
+    var.expr = packl_parser_parse_expr(self);
+
+    return var;
+}
+
 Node packl_parser_parse_identifier(PACKL *self) {
     Node node = {0};
 
@@ -325,6 +339,12 @@ Node packl_parser_parse_identifier(PACKL *self) {
     if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
         node.kind = NODE_KIND_FUNC_CALL;
         node.as.func_call = packl_parser_parse_func_call(self);
+        return node;
+    }
+
+    if (ppeek_(self, 1).kind == TOKEN_KIND_EQUAL) {
+        node.kind = NODE_KIND_VAR_REASSIGN;
+        node.as.var = packl_parser_parse_var_reassign(self);
         return node;
     }
 
@@ -419,45 +439,39 @@ While_Statement packl_parser_parse_while_statement(PACKL *self) {
     return hwile;
 }
 
+Node packl_parser_parse_proc_def_node(PACKL *self) {
+    return (Node) { .kind = NODE_KIND_PROC_DEF, .as.proc_def = packl_parser_parse_proc_def(self) };
+}
+
+Node packl_parser_parse_var_dec_node(PACKL *self) {
+    return (Node) { .kind = NODE_KIND_VAR_DECLARATION, .as.var_dec = packl_parser_parse_var_dec(self) };
+}
+
+Node packl_parser_parse_if_node(PACKL *self) {
+    return (Node) { .kind = NODE_KIND_IF,  .as.fi = packl_parser_parse_if_statement(self) };
+}
+
+Node packl_parser_parse_while_node(PACKL *self) {
+    return (Node) { .kind = NODE_KIND_WHILE, .as.hwile = packl_parser_parse_while_statement(self) };
+}
+
 Node packl_parser_parse_statement(PACKL *self) {
-    Node node = {0};
-
-    Token_Kind kind = ppeek(self).kind;
-
-    if (kind == TOKEN_KIND_NATIVE) {
-        return packl_parser_parse_native_call(self);
+    switch(ppeek(self).kind) {
+        case TOKEN_KIND_NATIVE:
+            return packl_parser_parse_native_call(self);
+        case TOKEN_KIND_IDENTIFIER:
+            return packl_parser_parse_identifier(self);
+        case TOKEN_KIND_PROC:
+            return packl_parser_parse_proc_def_node(self);
+        case TOKEN_KIND_VAR:
+            return packl_parser_parse_var_dec_node(self);
+        case TOKEN_KIND_IF:
+            return packl_parser_parse_if_node(self);
+        case TOKEN_KIND_WHILE:
+            return packl_parser_parse_while_node(self);
+        default:
+            PACKL_ERROR(self->filename, "unexpected token found at the beginning of a statement %s", token_kinds_str[ppeek(self).kind]);
     }
-
-    if (kind == TOKEN_KIND_IDENTIFIER) {
-        return packl_parser_parse_identifier(self);
-    }
-
-
-    if (kind == TOKEN_KIND_PROC) {
-        node.kind = NODE_KIND_PROC_DEF;
-        node.as.proc_def = packl_parser_parse_proc_def(self);
-        return node;
-    }
-
-    if (kind == TOKEN_KIND_VAR) {
-        node.kind = NODE_KIND_VAR_DECLARATION;
-        node.as.var_dec = packl_parser_parse_var_dec(self);
-        return node;
-    }
-
-    if (kind == TOKEN_KIND_IF) {
-        node.kind = NODE_KIND_IF;
-        node.as.fi = packl_parser_parse_if_statement(self);
-        return node;
-    }
-
-    if (kind == TOKEN_KIND_WHILE) {
-        node.kind = NODE_KIND_WHILE;   
-        node.as.hwile = packl_parser_parse_while_statement(self);
-        return node;
-    }
-
-    ASSERT(false, "unreachable");
 }
 
 AST packl_parser_parse_statements(PACKL *self) {
