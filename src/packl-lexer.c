@@ -72,6 +72,7 @@ bool packl_lexer_eof(PACKL *self) {
 
 Token packl_lexer_lex_string(PACKL *self) {
     Token token = {0};
+    token.loc = self->lexer.loc;
 
     char *begin = &self->lexer.source.content[self->lexer.current];
     size_t size = 0;
@@ -98,6 +99,9 @@ Token packl_lexer_lex_string(PACKL *self) {
 }
 
 Token packl_lexer_lex_id(PACKL *self) {
+    Token token = {0};
+    token.loc = self->lexer.loc;
+
     char *begin = &self->lexer.source.content[self->lexer.current];
     size_t size = 0;
 
@@ -113,19 +117,29 @@ Token packl_lexer_lex_id(PACKL *self) {
     // check for the natives
     for (size_t i = 0; i < ARR_SIZE(natives); ++i) {
         if (sv_eq(id, SV(natives[i]))) {
-            return (Token) { .kind = TOKEN_KIND_NATIVE, .text = SV_GET(begin, size) };
+            token.text = SV_GET(begin, size);
+            token.kind = TOKEN_KIND_NATIVE;
+            return token;
         }
     }
 
     // check for keywords
     for (size_t i = 0; i < ARR_SIZE(keywords); ++i) {
-        if (sv_eq(id, SV(keywords[i]))) { return (Token) { .kind = keyword_token_kinds[i], .text = SV_NULL }; }
+        if (sv_eq(id, SV(keywords[i]))) { 
+            token.kind = keyword_token_kinds[i];
+            return token;
+        }
     }
 
-    return (Token) { .kind = TOKEN_KIND_IDENTIFIER, .text = id };
+    token.text = id;
+    token.kind = TOKEN_KIND_IDENTIFIER;
+    return token;
 }
 
 Token packl_lexer_lex_number(PACKL *self) {
+    Token token = {0};
+    token.loc = self->lexer.loc;
+
     char *begin = &self->lexer.source.content[self->lexer.current];
     size_t size = 0;
 
@@ -136,10 +150,15 @@ Token packl_lexer_lex_number(PACKL *self) {
         size++;
     }
 
-    return (Token) { .kind = TOKEN_KIND_INTEGER_LIT, .text = SV_GET(begin, size) };
+    token.text = SV_GET(begin, size);
+    token.kind = TOKEN_KIND_INTEGER_LIT;
+    return token;
 }
 
 Token packl_lexer_read_token(PACKL *self) {
+    Token token = {0};
+    token.loc = self->lexer.loc;
+
     char *current = &self->lexer.source.content[self->lexer.current];
 
     String_View current_view = SV_GET(current, 1);
@@ -147,7 +166,9 @@ Token packl_lexer_read_token(PACKL *self) {
     for (size_t i = 0; i < ARR_SIZE(symbols); ++i) {
         if (sv_eq(SV(symbols[i]), current_view)) {
             ladv(self);
-            return (Token) { .kind = symbol_token_kinds[i], .text = SV_NULL };
+            token.kind = symbol_token_kinds[i];
+            token.text = current_view;
+            return token;
         }
     }
 
@@ -161,7 +182,7 @@ Token packl_lexer_read_token(PACKL *self) {
         TODO("handle negative numbers");
     }
 
-    PACKL_ERROR(self->filename, "failed to identify the char `%c`", *current);
+    PACKL_ERROR_LOC(self->filename, token.loc, "failed to identify the char `%c`", *current);
 }
 
 void packl_lexer_lex(PACKL *self) {
@@ -171,5 +192,5 @@ void packl_lexer_lex(PACKL *self) {
         Token token = lread(self);
         DA_APPEND(&self->tokens, token);
     }
-    DA_APPEND(&self->tokens, ((Token) { .kind = TOKEN_KIND_END }));
+    DA_APPEND(&self->tokens, ((Token) { .kind = TOKEN_KIND_END, .loc = self->lexer.loc }));
 }

@@ -6,6 +6,7 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "test.C": "cpp"
+        "test.C": "cpp",
+        "error.h": "c"
     }
 }

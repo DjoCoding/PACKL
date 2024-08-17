@@ -112,6 +112,7 @@ enum Token_Kind {
 };
 
 struct Token { 
+    Location loc;
     Token_Kind kind;
     String_View text;
 };
@@ -244,6 +245,7 @@ union Node_As {
 struct Node {
     Node_Kind kind;
     Node_As as;
+    Location loc;
 };
 
 struct AST {
