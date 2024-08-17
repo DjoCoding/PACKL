@@ -1,0 +1,9 @@
+proc println(s: str) {
+	write(s);
+	write("\n");
+}
+
+proc main() {
+	println("Djaoued");
+	exit(1);
+}

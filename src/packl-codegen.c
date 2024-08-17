@@ -228,7 +228,13 @@ void packl_generate_expr_push_int_code(FILE *f, PACKL *self, int64_t value, size
 void packl_generate_expr_push_string_code(FILE *f, PACKL *self,  String_View value, size_t indent) {
     fprint_indent(f, indent);
     packl_generate_pushs(f, self, value);
-    packl_generate_expr_push_int_code(f, self, (int64_t)value.count, indent);
+
+    // calculating the length of the string after the escaping
+    char *s = sv_escape(value);
+    size_t s_size = strlen(s);
+    free(s);
+
+    packl_generate_expr_push_int_code(f, self, (int64_t)s_size, indent);
 }
 
 void packl_generate_expr_bin_op_code(FILE *f, PACKL *self, Expr_Bin_Op bin, size_t indent) {
@@ -276,11 +282,7 @@ void packl_generate_exit(FILE *f, PACKL *self, Expression expr, size_t indent) {
 }
 
 void packl_generate_push_arg_code(FILE *f, PACKL *self, Func_Call_Arg arg, size_t indent) {
-    (void)f;
-    (void)self;
-    (void)arg;
-    (void)indent;
-    TODO("add arguments push to the stack");
+    packl_generate_expr_code(f, self, arg.expr, indent);
 }
 
 void packl_generate_push_args_code(FILE *f, PACKL *self, Func_Call_Args args, size_t indent) {
@@ -307,34 +309,84 @@ void packl_generate_native_call_code(FILE *f, PACKL *self, Func_Call func_call, 
     } else { ASSERT(false, "unreachable"); }
 }
 
+void packl_handle_proc_param(PACKL *self, Parameter param, size_t stack_pos){
+    Variable var = {0};
+    var.type = param.type;
+
+    if (sv_eq(var.type, SV("str"))) {
+        var.stack_pos = stack_pos - 1;
+    } else {
+        var.stack_pos = stack_pos;
+    }
+
+    Context_Item item = {0};
+    item.name = param.name;
+    item.type = CONTEXT_ITEM_TYPE_VARIABLE;
+    item.as.variable = var;
+
+    packl_push_item_in_current_context(self, item);
+}
+
+void packl_handle_proc_params(PACKL *self, Parameters params) {
+    for (size_t i = 0; i < params.count; ++i) {
+        Parameter param = params.items[params.count - i - 1];
+        packl_handle_proc_param(self, param, self->stack_size - i - 1);
+    }
+}
+
+Procedure packl_get_procedure(PACKL *self, Proc_Def proc_def) {
+    Procedure proc = {0};
+    
+    proc.label_value = self->label_value;
+    proc.params.items = malloc(sizeof(Parameter) * proc_def.params.count); 
+    proc.params.count = proc.params.size = proc_def.params.count;
+    memcpy(proc.params.items, proc_def.params.items, sizeof(Parameter) * proc_def.params.count);
+
+    return proc;
+}
+
+void packl_pop_scope(FILE *f, PACKL *self, size_t stack_pos, size_t indent) {
+    // this will try to adjust the stack pointer to be stack_pos by popping items from the stack
+    while(self->stack_size != stack_pos) {
+        fprint_indent(f, indent);
+        packl_generate_pop(f, self);
+    }
+} 
+
 void packl_generate_proc_def_code(FILE *f, PACKL *self, Proc_Def proc_def, size_t indent) {
     // check if the procedure is already defined in the current context
     Context_Item *found = packl_get_context_item_in_current_context(self, proc_def.name);
     if (found) { PACKL_ERROR(self->filename, "procedure " SV_FMT " already declared in the current scope as %s", SV_UNWRAP(proc_def.name), packl_get_context_item_type_as_cstr(found->type)); }
 
+    Procedure proc = packl_get_procedure(self, proc_def);
+    Context_Item item = { .type= CONTEXT_ITEM_TYPE_PROCEDURE, .name = proc_def.name, .as.proc = proc };
+
     // add the procedure to the current context
-    Procedure proc = {0};
-    
-    proc.params.items = malloc(sizeof(Parameter) * proc_def.params.count); 
-    proc.params.count = proc.params.size = proc_def.params.count;
-    memcpy(proc.params.items, proc_def.params.items, sizeof(Parameter) * proc_def.params.count);
-    
-    proc.label_value = self->label_value;
-
-    Context_Item item = {0};
-    item.name = proc_def.name;
-    item.type = CONTEXT_ITEM_TYPE_PROCEDURE;
-    item.as.proc = proc;
-
     packl_push_item_in_current_context(self, item);
     
+    // generate a label for the procedure call
     fprint_indent(f, indent);
     packl_generate_label(f, self->label_value++);
 
+    // pushing a new context for the procedure parameters and variables
+    packl_push_new_context(self);
+    packl_handle_proc_params(self, proc_def.params);
+
+    // generate the procedure body code
     packl_generate_body_code(f, self, *proc_def.body, indent + 1);
 
+    // get the context for scope popping
+    Context context = packl_get_current_context(self);
+    
+    // pop the scope
+    packl_pop_scope(f, self, context.stack_size, indent + 1);
+
+    // generate the ret instruction to return to the caller
     fprint_indent(f, indent + 1);
     packl_generate_ret(f, self);
+
+    // poping the procedure context
+    packl_pop_context(self);
 } 
 
 void packl_generate_var_dec_code(FILE *f, PACKL *self, Var_Declaration var_dec, size_t indent) {
