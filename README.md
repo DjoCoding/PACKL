@@ -7,7 +7,7 @@ PACKL is capable of printing "Hello World" to the screen
 
 ```scala 
 proc main() {
-    write("Hello World");
+    write("Hello World\n");
     exit(0);
 }
 ```
