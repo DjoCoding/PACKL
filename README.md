@@ -3,30 +3,29 @@ a very small programming language built on top of the PACKL Virtual Machine, it 
 
 
 # PACKL Features
-PACKL is capable of printing "Hello World" to the screen 
+## Hello World 
 
-```scala 
+```nim
 proc main() {
     write("Hello World\n");
     exit(0);
 }
 ```
 
-It supports both variable declaration and assignement
+## Variables Declaration and Re-Assignement 
 
-```scala 
+```nim
 proc main() {
     var foo: int = 10;
-    foo = foo + 2;
+    foo = foo - 10;
     exit(foo);
 }
 ```
 
-It supports functions and procedure defintions
-
+## Functions
 ```scala 
-proc foo() {
-    write("foo\n");
+func sub(a: int, b: int): int {
+    return a - b;
 }
 
 func add(a: int, b: int): int {
@@ -34,13 +33,12 @@ func add(a: int, b: int): int {
 }
 
 proc main() {
-    foo();
-    var i: int = add(1, 2);
+    var i: int = add(1, 2) - sub(8, 5);
     exit(i);
 }
 ```
 
-It supports if conditions with the else block
+## If Statements 
 
 ```scala 
 proc main() {
@@ -54,7 +52,7 @@ proc main() {
 }
 ```
 
-It supports while loops 
+## While loops
 
 ```scala 
 proc main() {
