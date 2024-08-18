@@ -23,7 +23,7 @@ proc main() {
 ```
 
 ## Functions
-```scala 
+```nim
 func sub(a: int, b: int): int {
     return a - b;
 }
@@ -40,7 +40,7 @@ proc main() {
 
 ## If Statements 
 
-```scala 
+```nim
 proc main() {
     var i: int = 10;
 
@@ -54,7 +54,7 @@ proc main() {
 
 ## While loops
 
-```scala 
+```nim
 proc main() {
     var i: int = 10;
     while (i) {
