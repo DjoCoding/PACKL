@@ -69,3 +69,48 @@ char *packl_get_context_item_type_as_cstr(Context_Item_Type type) {
 void packl_push_item_in_current_context(PACKL *self, Context_Item item) {
     DA_APPEND(&self->contexts.items[self->contexts.count - 1], item);
 }
+
+Parameters packl_copy_params(Parameters params) {
+    Parameters out = {0};
+    out.items = malloc(sizeof(Parameter) * params.count);
+    out.count = out.size = params.count;
+    memcpy(out.items, params.items, sizeof(Parameter) * params.count);
+    return out;
+}
+
+Variable packl_init_context_variable(String_View type, size_t pos) {
+    Variable var = {0};
+    var.stack_pos = pos;
+    var.type = type;
+    return var;
+}
+
+Function packl_init_context_function(String_View return_type, Parameters params, size_t label_value) {
+    Function func = {0};
+    func.label_value = label_value;
+    func.params = packl_copy_params(params);
+    func.return_type = return_type;
+    return func;
+}
+
+Procedure packl_init_context_procedure(Parameters params, size_t label_value) {
+    Procedure proc = {0};
+    proc.label_value = label_value;
+    proc.params = packl_copy_params(params);
+    return proc;
+}
+
+Context_Item packl_init_var_context_item(String_View name, String_View type, size_t pos) {
+    Variable var = packl_init_context_variable(type,pos);
+    return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_VARIABLE, .as.variable = var };
+} 
+
+Context_Item packl_init_func_context_item(String_View name, String_View return_type, Parameters params, size_t label_value) {
+    Function func = packl_init_context_function(return_type, params, label_value);
+    return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_FUNCTION, .as.func = func };
+}
+
+Context_Item packl_init_proc_context_item(String_View name, Parameters params, size_t label_value) {
+    Procedure proc = packl_init_context_procedure(params, label_value);
+    return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_PROCEDURE, .as.proc = proc };
+}

@@ -65,29 +65,32 @@ void packl_destroy_var_reassign(Var_Reassign var) {
     packl_destroy_expr(var.expr);
 }
 
+void packl_destroy_func_def(Func_Def func) {
+    packl_destroy_ast(*func.body);
+    free(func.params.items);
+    free(func.body);
+}
+
 void packl_destroy_node(Node node) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
-            packl_destroy_native_call(node.as.func_call);
-            break;
+            return packl_destroy_native_call(node.as.func_call);
         case NODE_KIND_FUNC_CALL:
-            packl_destroy_func_call(node.as.func_call);
-            break;
+            return packl_destroy_func_call(node.as.func_call);
         case NODE_KIND_PROC_DEF:
-            packl_destroy_proc_def(node.as.proc_def);
-            break;
+            return packl_destroy_proc_def(node.as.proc_def);
         case NODE_KIND_VAR_DECLARATION:
-            packl_destroy_var_dec(node.as.var_dec);
-            break;
+            return packl_destroy_var_dec(node.as.var_dec);
         case NODE_KIND_IF:
-            packl_destroy_if(node.as.fi);
-            break;
+            return packl_destroy_if(node.as.fi);
         case NODE_KIND_WHILE:
-            packl_destroy_while(node.as.hwile);
-            break;
+            return packl_destroy_while(node.as.hwile);
         case NODE_KIND_VAR_REASSIGN:
-            packl_destroy_var_reassign(node.as.var);
-            break;
+            return packl_destroy_var_reassign(node.as.var);
+        case NODE_KIND_FUNC_DEF:
+            return packl_destroy_func_def(node.as.func_def);
+        case NODE_KIND_RETURN:
+            return packl_destroy_expr(node.as.ret);
         default:
             ASSERT(false, "unreachable");
     }

@@ -13,4 +13,10 @@ char *packl_get_context_item_type_as_cstr(Context_Item_Type type);
 void packl_pop_context(PACKL *self);
 void packl_remove_contexts(PACKL *self);
 
+
+Context_Item packl_init_var_context_item(String_View name, String_View type, size_t pos);
+Context_Item packl_init_func_context_item(String_View name, String_View return_type, Parameters params, size_t label_value);
+Context_Item packl_init_proc_context_item(String_View name, Parameters params, size_t label_value);
+
+
 #endif 

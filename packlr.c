@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
     char *filepath = *argv++;
     
     char command[4000] = {0};
-    sprintf(command, "./bin/pc %s -code -out file.pasm\n", filepath);
+    sprintf(command, "./bin/packlc %s -code -out file.pasm\n", filepath);
     if (system(command)) {
         fprintf(stderr, "compilation failed\n");
         exit(1);
@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     
     sprintf(command, "./bin/pvmr file.pvm\n");
     if (system(command)) {
-        fprintf(stderr, "executing failed\n");
+        fprintf(stderr, "execution failed\n");
         exit(1);
     }
 

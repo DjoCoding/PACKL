@@ -28,6 +28,9 @@ typedef struct Parser Parser;
 typedef struct Parameter Parameter;
 typedef struct Parameters Parameters;
 
+// function definition
+typedef struct Func_Def Func_Def;
+
 // procedure defintion
 typedef struct Proc_Def Proc_Def;
 
@@ -65,6 +68,7 @@ typedef struct Node Node;
 typedef struct AST AST;
 
 // Context 
+typedef struct Function Function;
 typedef struct Variable Variable;
 typedef struct Procedure Procedure;
 typedef enum Context_Item_Type Context_Item_Type;
@@ -102,6 +106,8 @@ enum Token_Kind {
     TOKEN_KIND_GREATER,
     
     TOKEN_KIND_PROC,
+    TOKEN_KIND_FUNC,
+    TOKEN_KIND_RETURN,
     TOKEN_KIND_VAR,
     TOKEN_KIND_IF,
     TOKEN_KIND_ELSE,
@@ -135,11 +141,13 @@ enum Node_Kind {
     NODE_KIND_FUNC_CALL = 0,
     NODE_KIND_NATIVE_CALL,
     NODE_KIND_PROC_DEF,
+    NODE_KIND_FUNC_DEF,
     NODE_KIND_VAR_DECLARATION,
     NODE_KIND_EXPR,
     NODE_KIND_IF,
     NODE_KIND_WHILE,
     NODE_KIND_VAR_REASSIGN,
+    NODE_KIND_RETURN,
 };
 
 enum Expr_Kind {
@@ -148,6 +156,7 @@ enum Expr_Kind {
     EXPR_KIND_STRING,
     EXPR_KIND_ID,
     EXPR_KIND_FUNC_CALL,
+    EXPR_KIND_NOT_INITIALIZED,
 };
 
 enum Operator {
@@ -176,6 +185,25 @@ struct Expression {
     Expr_As as;
 };  
 
+struct Parameter {
+    String_View type;
+    String_View name;
+};  
+
+struct Parameters { 
+    Parameter *items;
+    size_t count;
+    size_t size;
+};
+
+struct Func_Def {
+    String_View name;
+    Parameters params;
+    AST *body;
+    String_View return_type;
+};
+
+
 struct Var_Reassign {
     String_View name;
     Expression expr;
@@ -203,17 +231,6 @@ struct Var_Declaration {
     Expression value;
 };
 
-struct Parameter {
-    String_View type;
-    String_View name;
-};  
-
-struct Parameters { 
-    Parameter *items;
-    size_t count;
-    size_t size;
-};
-
 struct Proc_Def {
     String_View name;
     Parameters params;
@@ -239,11 +256,13 @@ struct Func_Call {
 union Node_As {
     Func_Call func_call;
     Proc_Def proc_def;
+    Func_Def func_def;
     Var_Declaration var_dec;
     Expression expr;
     If_Statement fi;
     While_Statement hwile;
     Var_Reassign var;
+    Expression ret;
 };
 
 struct Node {
@@ -272,14 +291,22 @@ struct Variable {
     size_t stack_pos;  
 };
 
+struct Function {
+    size_t label_value;
+    Parameters params;
+    String_View return_type;
+};
+
 enum Context_Item_Type {
     CONTEXT_ITEM_TYPE_PROCEDURE = 0,
     CONTEXT_ITEM_TYPE_VARIABLE,
+    CONTEXT_ITEM_TYPE_FUNCTION,
 };
 
 union Context_Item_As {
     Procedure proc;
     Variable variable;
+    Function func;
 };
 
 struct Context_Item {

@@ -21,12 +21,18 @@ char *token_kinds[] = {
     "*",
     "/",
     "%",
+    "<",
+    ">",
 
     "proc",
+    "func",
+    "return",
     "var",
     "if",
     "else",
     "while",
+
+    "end",
 };
 
 void packl_print_func_call(Func_Call func_call, size_t indent);
@@ -91,7 +97,7 @@ void packl_print_expr(Expression expr, size_t indent) {
         printf("integer: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_ID) {
         print_indent(indent);
-        printf("identifier: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
+        printf("identifier: `" SV_FMT "`\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_FUNC_CALL) {
         packl_print_func_call(*expr.as.func, indent);
     } else if (expr.kind == EXPR_KIND_BIN_OP) {
@@ -120,7 +126,7 @@ void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
 
 void packl_print_func_call(Func_Call func_call, size_t indent) {
     print_indent(indent);
-    printf("func name: "SV_FMT"\n", SV_UNWRAP(func_call.name));
+    printf("func name: `"SV_FMT"`\n", SV_UNWRAP(func_call.name));
 
     print_indent(indent + 1);
     printf("args:\n");
@@ -129,8 +135,8 @@ void packl_print_func_call(Func_Call func_call, size_t indent) {
 
 void packl_print_param(Parameter param, size_t indent) {
     print_indent(indent);
-    printf("name: " SV_FMT, SV_UNWRAP(param.name));
-    printf(", type: " SV_FMT "\n", SV_UNWRAP(param.type));
+    printf("name: `" SV_FMT "`", SV_UNWRAP(param.name));
+    printf(", type: `" SV_FMT "` \n", SV_UNWRAP(param.type));
 }
 
 void packl_print_params(Parameters params, size_t indent) {
@@ -153,7 +159,7 @@ void packl_print_body(AST body, size_t indent) {
 
 void packl_print_proc_def(Proc_Def proc_def, size_t indent) {
     print_indent(indent);
-    printf("proc name: "SV_FMT"\n", SV_UNWRAP(proc_def.name));
+    printf("proc name: `"SV_FMT"`\n", SV_UNWRAP(proc_def.name));
 
     print_indent(indent + 1);
     printf("params:\n");
@@ -164,10 +170,10 @@ void packl_print_proc_def(Proc_Def proc_def, size_t indent) {
 
 void packl_print_var_dec(Var_Declaration var_dec, size_t indent) {
     print_indent(indent);
-    printf("variable name: " SV_FMT "\n", SV_UNWRAP(var_dec.name));
+    printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var_dec.name));
 
     print_indent(indent);
-    printf("variable type: " SV_FMT "\n", SV_UNWRAP(var_dec.type));
+    printf("variable type: `" SV_FMT "`\n", SV_UNWRAP(var_dec.type));
 
     print_indent(indent);
     printf("value:\n");
@@ -186,7 +192,7 @@ void packl_print_if(If_Statement fi, size_t indent) {
     printf("condition:\n");
     packl_print_expr(fi.condition, indent + 1);
 
-    packl_print_body(*fi.body, indent);
+    packl_print_body(*fi.body, indent + 1);
 
     if (fi.esle) {
         packl_print_else(*fi.esle, indent);
@@ -197,16 +203,26 @@ void packl_print_while(While_Statement hwile, size_t indent) {
     print_indent(indent);
     printf("condition:\n");
     packl_print_expr(hwile.condition, indent + 1);
-    packl_print_body(*hwile.body, indent);
+    packl_print_body(*hwile.body, indent + 1);
 }
 
 void packl_print_var_reassign(Var_Reassign var, size_t indent) {
     print_indent(indent);
-    printf("variable name: " SV_FMT "\n", SV_UNWRAP(var.name));
+    printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var.name));
 
     print_indent(indent);
     printf("value:\n");
     packl_print_expr(var.expr, indent + 1);
+}
+
+void packl_print_func_def(Func_Def func, size_t indent) {
+    print_indent(indent);
+    printf("function name: `" SV_FMT "`\n", SV_UNWRAP(func.name));
+
+    print_indent(indent);
+    printf("return type: `" SV_FMT "`\n", SV_UNWRAP(func.return_type));
+
+    packl_print_body(*func.body, indent + 1);
 }
 
 void packl_print_native_call_node(Node node, size_t indent) {
@@ -252,29 +268,38 @@ void packl_print_var_reassign_node(Node node, size_t indent) {
     packl_print_var_reassign(node.as.var, indent + 1);
 }
 
+void packl_print_func_def_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: function definition\n");
+    packl_print_func_def(node.as.func_def, indent + 1);
+}
+
+void packl_print_return_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("return:\n");
+    packl_print_expr(node.as.ret, indent + 1);
+}
+
 void packl_print_ast_node(Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
-            packl_print_native_call_node(node, indent);
-            break;
+            return packl_print_native_call_node(node, indent);
         case NODE_KIND_FUNC_CALL:
-            packl_print_func_call_node(node, indent);
-            break;
+            return packl_print_func_call_node(node, indent);
         case NODE_KIND_PROC_DEF:
-            packl_print_proc_def_node(node, indent);
-            break;
+            return packl_print_proc_def_node(node, indent);
         case NODE_KIND_VAR_DECLARATION:
-            packl_print_var_dec_node(node, indent);
-            break;
+            return packl_print_var_dec_node(node, indent);
         case NODE_KIND_IF:
-            packl_print_if_node(node, indent);
-            break;
+            return packl_print_if_node(node, indent);
         case NODE_KIND_WHILE:
-            packl_print_while_node(node, indent);
-            break;
+            return packl_print_while_node(node, indent);
         case NODE_KIND_VAR_REASSIGN:
-            packl_print_var_reassign_node(node, indent);
-            break;
+            return packl_print_var_reassign_node(node, indent);
+        case NODE_KIND_FUNC_DEF:
+            return packl_print_func_def_node(node, indent);
+        case NODE_KIND_RETURN:
+            return packl_print_return_node(node, indent);
         default:
             ASSERT(false, "unreachable");
     }

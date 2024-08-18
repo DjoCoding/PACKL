@@ -38,6 +38,8 @@ Token_Kind symbol_token_kinds[] = {
 
 char *keywords[] = {
     "proc",
+    "func",
+    "return",
     "var",
     "if",
     "else",
@@ -51,6 +53,8 @@ char *natives[] = {
 
 Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_PROC,
+    TOKEN_KIND_FUNC,
+    TOKEN_KIND_RETURN,
     TOKEN_KIND_VAR,
     TOKEN_KIND_IF,
     TOKEN_KIND_ELSE,

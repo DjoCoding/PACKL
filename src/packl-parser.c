@@ -175,7 +175,9 @@ AST packl_parser_parse_body(PACKL *self) {
         Node node = pstmt(self);
         
         if (node.kind == NODE_KIND_PROC_DEF) { PACKL_ERROR_LOC(self->filename, node.loc, "procedure `" SV_FMT "` defined inside a body", SV_UNWRAP(node.as.proc_def.name)); }
-        
+        if (node.kind == NODE_KIND_FUNC_DEF) { PACKL_ERROR_LOC(self->filename, node.loc, "function `" SV_FMT "` defined inside a body", SV_UNWRAP(node.as.func_def.name)); }
+
+
         DA_APPEND(&ast, node);
         if (ppeek(self).kind == TOKEN_KIND_SEMI_COLON) { padv(self); }
     }
@@ -392,6 +394,7 @@ Expression packl_parser_parse_comparative_expr(PACKL *self) {
 }
 
 Expression packl_parser_parse_expr(PACKL *self) {
+    if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected an expresssion but end found"); }
     return packl_parser_parse_comparative_expr(self);
 }
 
@@ -521,6 +524,43 @@ While_Statement packl_parser_parse_while_statement(PACKL *self) {
     return hwile;
 }
 
+Func_Def packl_parser_parse_func_def(PACKL *self) {
+    Func_Def func = {0};
+    
+    // consuming the `func` token 
+    padv(self);
+
+    Token token = {0};
+    
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    func.name = token.text;
+
+    if (ppeek(self).kind == TOKEN_KIND_OPEN_PARENT) {
+        padv(self);
+        func.params = packl_parser_parse_params(self);
+        pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+    }
+
+    // for the return type
+    pexp(self, TOKEN_KIND_COLON, NULL);
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    func.return_type = token.text;
+
+    pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, &token);
+
+    func.body = malloc(sizeof(AST));
+    *func.body = packl_parser_parse_body(self);
+
+    pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, &token);
+
+    return func;
+}
+
+Expression packl_parser_parse_return(PACKL *self) {
+    pexp(self, TOKEN_KIND_RETURN, NULL);
+    return packl_parser_parse_expr(self);
+}
+
 Node packl_parser_parse_proc_def_node(PACKL *self) {
     Node node = packl_init_node(NODE_KIND_PROC_DEF, ppeek(self).loc);
     node.as.proc_def = packl_parser_parse_proc_def(self);
@@ -545,6 +585,18 @@ Node packl_parser_parse_while_node(PACKL *self) {
     return node;
 }
 
+Node packl_parser_parse_func_def_node(PACKL *self) {
+    Node node = packl_init_node(NODE_KIND_FUNC_DEF, ppeek(self).loc);
+    node.as.func_def = packl_parser_parse_func_def(self);
+    return node;
+}
+
+Node packl_parser_parse_return_node(PACKL *self) {
+    Node node = packl_init_node(NODE_KIND_RETURN, ppeek(self).loc);
+    node.as.ret = packl_parser_parse_return(self);
+    return node;
+}
+
 Node packl_parser_parse_statement(PACKL *self) {
     switch(ppeek(self).kind) {
         case TOKEN_KIND_NATIVE:
@@ -559,6 +611,10 @@ Node packl_parser_parse_statement(PACKL *self) {
             return packl_parser_parse_if_node(self);
         case TOKEN_KIND_WHILE:
             return packl_parser_parse_while_node(self);
+        case TOKEN_KIND_FUNC:
+            return packl_parser_parse_func_def_node(self);
+        case TOKEN_KIND_RETURN:
+            return packl_parser_parse_return_node(self);
         default:
             PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found at the beginning of a statement `" SV_FMT "`", SV_UNWRAP(ppeek(self).text));
     }
