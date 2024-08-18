@@ -3,6 +3,7 @@
 char *context_item_as_cstr[] = {
     "procedure",
     "variable",
+    "function",
 };
 
 Context packl_get_current_context(PACKL *self) {
@@ -113,4 +114,31 @@ Context_Item packl_init_func_context_item(String_View name, String_View return_t
 Context_Item packl_init_proc_context_item(String_View name, Parameters params, size_t label_value) {
     Procedure proc = packl_init_context_procedure(params, label_value);
     return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_PROCEDURE, .as.proc = proc };
+}
+
+
+void packl_find_item_and_report_error_if_found(PACKL *self, String_View name, Location loc) {
+    Context_Item *item = packl_get_context_item_in_all_contexts(self, name);
+    if (!item) { return; }
+    PACKL_ERROR_LOC(self->filename, loc, SV_FMT " declared twice, first declared as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]);
+}
+
+void packl_find_item_in_current_context_and_report_error_if_found(PACKL *self, String_View name, Location loc) {
+    Context_Item *item = packl_get_context_item_in_current_context(self, name);
+    if (!item) { return; }
+    PACKL_ERROR_LOC(self->filename, loc, SV_FMT " declared twice, first declared as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]);
+}
+
+Variable packl_find_variable(PACKL *self, String_View name, Location loc) {
+    Context_Item *item = packl_get_context_item_in_all_contexts(self, name);
+    if (!item) { PACKL_ERROR_LOC(self->filename, loc, "variable `" SV_FMT "` referenced before declaration", SV_UNWRAP(name)); }
+    if (item->type != CONTEXT_ITEM_TYPE_VARIABLE) { PACKL_ERROR_LOC(self->filename, loc, "expected `" SV_FMT "` to be a variable but found as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]); }
+    return item->as.variable;
+}
+
+Context_Item *packl_find_function_or_procedure(PACKL *self, String_View name, Location loc) {
+    Context_Item *item = packl_get_context_item_in_all_contexts(self, name);
+    if (!item) { PACKL_ERROR_LOC(self->filename, loc, "function `" SV_FMT "` called before declaration", SV_UNWRAP(name)); }
+    if (item->type != CONTEXT_ITEM_TYPE_FUNCTION && item->type != CONTEXT_ITEM_TYPE_PROCEDURE) { PACKL_ERROR_LOC(self->filename, loc, "expected `" SV_FMT "` to be a function or a procedure but found as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]); }
+    return item;
 }

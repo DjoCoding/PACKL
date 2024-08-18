@@ -18,5 +18,10 @@ Context_Item packl_init_var_context_item(String_View name, String_View type, siz
 Context_Item packl_init_func_context_item(String_View name, String_View return_type, Parameters params, size_t label_value);
 Context_Item packl_init_proc_context_item(String_View name, Parameters params, size_t label_value);
 
+void packl_find_item_and_report_error_if_found(PACKL *self, String_View name, Location loc);
+void packl_find_item_in_current_context_and_report_error_if_found(PACKL *self, String_View name, Location loc);
+
+Variable packl_find_variable(PACKL *self, String_View name, Location loc);
+Context_Item *packl_find_function_or_procedure(PACKL *self, String_View name, Location loc);
 
 #endif 

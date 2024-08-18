@@ -6,7 +6,7 @@ a very small programming language built on top of the PACKL Virtual Machine, it 
 ## Hello World 
 
 ```nim
-proc main() {
+proc main() {P
     write("Hello World\n");
     exit(0);
 }

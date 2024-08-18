@@ -105,6 +105,8 @@ void packl_print_expr(Expression expr, size_t indent) {
         packl_print_operator(expr.as.bin.op, indent + 1);
         packl_print_expr(*expr.as.bin.lhs, indent + 2);
         packl_print_expr(*expr.as.bin.rhs, indent + 2);
+    } else if (expr.kind == EXPR_KIND_NATIVE_CALL) {
+        packl_print_func_call(*expr.as.func, indent);
     } else { ASSERT(false, "unreachable"); }
 }
 

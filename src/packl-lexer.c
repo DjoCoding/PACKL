@@ -49,6 +49,7 @@ char *keywords[] = {
 char *natives[] = {
     "write",
     "exit",
+    "get_byte",
 };
 
 Token_Kind keyword_token_kinds[] = {

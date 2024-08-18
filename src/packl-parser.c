@@ -256,6 +256,14 @@ Expression get_func_call_expr(Func_Call func) {
     return expr;
 }
 
+Expression get_native_call_expr(Func_Call func) {
+    Expression expr = {0};
+    expr.kind = EXPR_KIND_NATIVE_CALL;
+    expr.as.func = malloc(sizeof(Func_Call));
+    *expr.as.func = func;
+    return expr;
+}
+
 int ismultiplicative(Token_Kind kind) {
     Token_Kind kinds[] = {
         TOKEN_KIND_STAR,
@@ -328,6 +336,15 @@ Expression packl_parser_parse_primary_expr(PACKL *self) {
         Expression expr = packl_parser_parse_comparative_expr(self);
         pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
         return expr;
+    }
+
+    if (token.kind == TOKEN_KIND_NATIVE) {
+        if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT)  {
+            Func_Call native = packl_parser_parse_func_call(self);
+            return get_native_call_expr(native);
+        }
+
+        PACKL_ERROR_LOC(self->filename, token.loc, "expected `(` after the native `" SV_FMT "`", SV_UNWRAP(token.text));
     }
 
     PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found when parsing expression `" SV_FMT "`", SV_UNWRAP(token.text));
