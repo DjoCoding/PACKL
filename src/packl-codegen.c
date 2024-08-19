@@ -385,9 +385,9 @@ void packl_check_caller_arity(FILE *f, PACKL *self, Node caller, size_t params_c
     // Add type checking for this 
 }
 
-void packl_push_params(FILE *f, PACKL *self, Func_Call_Args args, size_t indent) {
+void packl_push_params(FILE *f, PACKL *self, PACKL_Args args, size_t indent) {
     for(size_t i = 0; i < args.count; ++i) {
-        Func_Call_Arg arg = args.items[i];
+        PACKL_Arg arg = args.items[i];
         packl_generate_expr_code(f, self, arg.expr, indent);
     }
 }
@@ -554,11 +554,10 @@ void packl_generate_if_node(FILE *f, PACKL *self, Node if_node, size_t indent) {
     
     packl_generate_jmp(f, self, label + 1, indent);    // for the quit part
     
-    if (fi.esle) {
-        packl_generate_label(f, label, indent);
-        
+    packl_generate_label(f, label, indent);
+    if (fi.esle) {        
         packl_generate_statements(f, self, *fi.esle, indent);
-    }
+    } 
 
     packl_generate_label(f, label + 1, indent);
 
@@ -597,6 +596,72 @@ void packl_generate_while_node(FILE *f, PACKL *self, Node while_node, size_t ind
     packl_pop_context(self);
 }
 
+// New context 
+// Initialize
+// make label 
+// generate condition 
+// evaluate condition 
+// make jumps 
+
+
+void packl_check_for_arguments(PACKL *self, For_Statement rof) {
+    if (rof.args.count < 2) {
+        PACKL_ERROR(self->filename, "too few arguments for the for loop, expected 2 got %zu", rof.args.count);
+    }
+
+    if (rof.args.count > 2) {
+        PACKL_ERROR(self->filename, "too many arguments for the for loop, expected 2 got %zu", rof.args.count);
+    }
+}
+
+void packl_push_for_iterator(FILE *f, PACKL *self, For_Statement rof, size_t indent) {
+    Context_Item iter = packl_init_var_context_item(rof.iter, rof.iter_type, self->stack_size);
+    packl_push_item_in_current_context(self, iter);
+    packl_generate_expr_code(f, self, rof.args.items[0].expr, indent);
+}
+
+void packl_reassign_for_iter(FILE *f, PACKL *self, For_Statement rof, size_t indent) {
+    Variable iter_var = packl_find_variable(self, rof.iter, (Location) {0, 0});
+    packl_generate_indup(f, self, self->stack_size - iter_var.stack_pos - 1, indent);
+    packl_generate_push(f, self, 1, indent);
+    packl_generate_add(f, self, indent);
+    packl_generate_inswap(f, self, self->stack_size - iter_var.stack_pos - 1, indent);
+    packl_generate_pop(f, self, indent);
+}
+
+void packl_generate_for_node(FILE *f, PACKL *self, Node for_node, size_t indent) {
+    For_Statement rof = for_node.as.rof;
+
+    size_t label = self->label_value;
+    self->label_value += 2;      
+        
+    size_t stack_size = self->stack_size;
+
+    packl_check_for_arguments(self, rof);
+    packl_push_new_context(self);
+    packl_push_for_iterator(f, self, rof, indent);
+
+    packl_generate_label(f, label, indent);
+
+    packl_generate_dup(f, self, indent + 1);
+    packl_generate_expr_code(f, self, rof.args.items[1].expr, indent + 1);
+    packl_generate_cmp(f, self, indent + 1);
+    packl_generate_jg(f, self, label + 1, indent + 1);         // for the exit part
+    
+    // for body
+    packl_generate_statements(f, self, *rof.body, indent + 1);
+
+    packl_reassign_for_iter(f, self, rof, indent + 1);
+    
+    packl_generate_jmp(f, self, label, indent + 1);    
+
+    packl_generate_label(f, label + 1, indent);
+
+    self->stack_size = stack_size;
+
+    packl_pop_context(self);
+}
+
 void packl_generate_statement(FILE *f, PACKL *self, Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_PROC_DEF:
@@ -615,6 +680,8 @@ void packl_generate_statement(FILE *f, PACKL *self, Node node, size_t indent) {
             return packl_generate_if_node(f, self, node, indent);
         case NODE_KIND_WHILE:   
             return packl_generate_while_node(f, self, node, indent);
+        case NODE_KIND_FOR:
+            return packl_generate_for_node(f, self, node, indent);
         default:
             ASSERT(false, "unreachable");
     }

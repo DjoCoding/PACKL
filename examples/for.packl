@@ -2,15 +2,9 @@ proc foo() {
     write(0, "foo\n", 4);
 }
 
-proc bar() {
-    write(0, "bar\n", 4);
-}
-
 proc main() {
-    if (1) {
+    for i: int in (1, 10) {
         foo();
-    } else {
-        bar();
     }
     exit(0);
 }

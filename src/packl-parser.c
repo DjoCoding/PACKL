@@ -90,21 +90,21 @@ void packl_parser_expect(PACKL *self, Token_Kind kind, Token *token) {
     padv(self);
 }
 
-Func_Call_Arg packl_parser_parse_func_arg(PACKL *self) {
-    Func_Call_Arg arg = {0};
+PACKL_Arg packl_parser_parse_arg(PACKL *self) {
+    PACKL_Arg arg = {0};
     arg.expr = packl_parser_parse_expr(self);
     return arg;
 }
 
 
-Func_Call_Args packl_parser_parse_func_args(PACKL *self) {
-    Func_Call_Args args = {0};
-    DA_INIT(&args, sizeof(Func_Call_Arg));
+PACKL_Args packl_parser_parse_args(PACKL *self) {
+    PACKL_Args args = {0};
+    DA_INIT(&args, sizeof(PACKL_Arg));
 
     if (ppeek(self).kind == TOKEN_KIND_CLOSE_PARENT) { return args; }
     
     while (!peot(self)) {
-        Func_Call_Arg arg = packl_parser_parse_func_arg(self);
+        PACKL_Arg arg = packl_parser_parse_arg(self);
         DA_APPEND(&args, arg);
 
         Token token = ppeek(self);
@@ -128,7 +128,7 @@ Func_Call packl_parser_parse_func_call(PACKL *self) {
 
     // parsing arguments
     pexp(self, TOKEN_KIND_OPEN_PARENT, NULL);
-    func_call.args = packl_parser_parse_func_args(self);
+    func_call.args = packl_parser_parse_args(self);
     pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
 
     return func_call;
@@ -573,6 +573,34 @@ Func_Def packl_parser_parse_func_def(PACKL *self) {
     return func;
 }
 
+For_Statement packl_parser_parser_for(PACKL *self) {
+    For_Statement rof = {0};
+
+    pexp(self, TOKEN_KIND_FOR, NULL);
+
+    Token token = {0};
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    rof.iter = token.text;
+
+    pexp(self, TOKEN_KIND_COLON, NULL);
+    
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    rof.iter_type = token.text;
+
+    pexp(self, TOKEN_KIND_IN, NULL);
+
+    pexp(self, TOKEN_KIND_OPEN_PARENT, NULL);
+    rof.args = packl_parser_parse_args(self);
+    pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+
+    pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, NULL);
+    rof.body = malloc(sizeof(AST));
+    *rof.body = packl_parser_parse_body(self);
+    pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, NULL);
+
+    return rof;
+}
+
 Expression packl_parser_parse_return(PACKL *self) {
     pexp(self, TOKEN_KIND_RETURN, NULL);
     return packl_parser_parse_expr(self);
@@ -614,6 +642,12 @@ Node packl_parser_parse_return_node(PACKL *self) {
     return node;
 }
 
+Node packl_parser_parse_for_node(PACKL *self) {
+    Node node = packl_init_node(NODE_KIND_FOR, ppeek(self).loc);
+    node.as.rof = packl_parser_parser_for(self);
+    return node;
+}
+
 Node packl_parser_parse_statement(PACKL *self) {
     switch(ppeek(self).kind) {
         case TOKEN_KIND_NATIVE:
@@ -632,6 +666,8 @@ Node packl_parser_parse_statement(PACKL *self) {
             return packl_parser_parse_func_def_node(self);
         case TOKEN_KIND_RETURN:
             return packl_parser_parse_return_node(self);
+        case TOKEN_KIND_FOR:
+            return packl_parser_parse_for_node(self);
         default:
             PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found at the beginning of a statement `" SV_FMT "`", SV_UNWRAP(ppeek(self).text));
     }

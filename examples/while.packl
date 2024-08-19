@@ -2,7 +2,7 @@ proc main() {
 	var i: int = 10;
 
 	while(i) {
-		write("Hello World\n");	
+		write(0, "Hello World\n", 12);	
 		i = i - 1;
 	}
 	

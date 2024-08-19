@@ -44,6 +44,8 @@ char *keywords[] = {
     "if",
     "else",
     "while",
+    "for",
+    "in",
 };
 
 char *natives[] = {
@@ -60,6 +62,8 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_IF,
     TOKEN_KIND_ELSE,
     TOKEN_KIND_WHILE,
+    TOKEN_KIND_FOR,
+    TOKEN_KIND_IN,
 };
 
 char packl_lexer_peek(PACKL *self) {

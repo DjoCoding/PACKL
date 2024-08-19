@@ -31,6 +31,8 @@ char *token_kinds[] = {
     "if",
     "else",
     "while",
+    "for",
+    "in",
 
     "end",
 };
@@ -110,16 +112,16 @@ void packl_print_expr(Expression expr, size_t indent) {
     } else { ASSERT(false, "unreachable"); }
 }
 
-void packl_print_func_call_arg(Func_Call_Arg arg, size_t indent) {
+void packl_print_arg(PACKL_Arg arg, size_t indent) {
     packl_print_expr(arg.expr, indent);
 }
 
-void packl_print_func_call_args(Func_Call_Args args, size_t indent) {
+void packl_print_args(PACKL_Args args, size_t indent) {
     print_indent(indent);
     printf("begin\n");
 
     for(size_t i = 0; i < args.count; ++i) {
-        packl_print_func_call_arg(args.items[i], indent + 1);
+        packl_print_arg(args.items[i], indent + 1);
     }
 
     print_indent(indent);
@@ -132,7 +134,7 @@ void packl_print_func_call(Func_Call func_call, size_t indent) {
 
     print_indent(indent + 1);
     printf("args:\n");
-    packl_print_func_call_args(func_call.args, indent + 2);
+    packl_print_args(func_call.args, indent + 2);
 }
 
 void packl_print_param(Parameter param, size_t indent) {
@@ -206,6 +208,13 @@ void packl_print_while(While_Statement hwile, size_t indent) {
     printf("condition:\n");
     packl_print_expr(hwile.condition, indent + 1);
     packl_print_body(*hwile.body, indent + 1);
+}
+
+void packl_print_for(For_Statement rof, size_t indent) {
+    print_indent(indent);
+    printf("iterator: `" SV_FMT "`, type: `" SV_FMT "`\n", SV_UNWRAP(rof.iter), SV_UNWRAP(rof.iter_type));
+    packl_print_args(rof.args, indent + 1);
+    packl_print_body(*rof.body, indent + 1);
 }
 
 void packl_print_var_reassign(Var_Reassign var, size_t indent) {
@@ -282,6 +291,12 @@ void packl_print_return_node(Node node, size_t indent) {
     packl_print_expr(node.as.ret, indent + 1);
 }
 
+void packl_print_for_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: for statement\n");
+    packl_print_for(node.as.rof, indent + 1);
+}
+
 void packl_print_ast_node(Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -302,6 +317,8 @@ void packl_print_ast_node(Node node, size_t indent) {
             return packl_print_func_def_node(node, indent);
         case NODE_KIND_RETURN:
             return packl_print_return_node(node, indent);
+        case NODE_KIND_FOR:
+            return packl_print_for_node(node, indent);
         default:
             ASSERT(false, "unreachable");
     }

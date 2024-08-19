@@ -71,6 +71,12 @@ void packl_destroy_func_def(Func_Def func) {
     free(func.body);
 }
 
+void packl_destroy_for(For_Statement rof) {
+    packl_destroy_ast(*rof.body);
+    free(rof.args.items);
+    free(rof.body);
+} 
+
 void packl_destroy_node(Node node) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -91,6 +97,8 @@ void packl_destroy_node(Node node) {
             return packl_destroy_func_def(node.as.func_def);
         case NODE_KIND_RETURN:
             return packl_destroy_expr(node.as.ret);
+        case NODE_KIND_FOR:
+            return packl_destroy_for(node.as.rof);
         default:
             ASSERT(false, "unreachable");
     }

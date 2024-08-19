@@ -44,14 +44,17 @@ typedef struct Expression Expression;
 // While Statement
 typedef struct While_Statement While_Statement;
 
+// For Statement
+typedef struct For_Statement For_Statement;
+
 // If Statement
 typedef struct If_Statement If_Statement;
 
 // function call 
-typedef enum Func_Call_Arg_Type Func_Call_Arg_Type;
-typedef union Func_Call_Arg_As Func_Call_Arg_As;
-typedef struct Func_Call_Arg Func_Call_Arg;
-typedef struct Func_Call_Args Func_Call_Args;
+typedef enum PACKL_Arg_Type PACKL_Arg_Type;
+typedef union PACKL_Arg_As PACKL_Arg_As;
+typedef struct PACKL_Arg PACKL_Arg;
+typedef struct PACKL_Args PACKL_Args;
 typedef struct Func_Call Func_Call;
 
 // variable declaration
@@ -112,6 +115,8 @@ enum Token_Kind {
     TOKEN_KIND_IF,
     TOKEN_KIND_ELSE,
     TOKEN_KIND_WHILE,
+    TOKEN_KIND_FOR,
+    TOKEN_KIND_IN,
 
     TOKEN_KIND_END,
 
@@ -142,12 +147,13 @@ enum Node_Kind {
     NODE_KIND_NATIVE_CALL,
     NODE_KIND_PROC_DEF,
     NODE_KIND_FUNC_DEF,
+    NODE_KIND_RETURN,
     NODE_KIND_VAR_DECLARATION,
+    NODE_KIND_VAR_REASSIGN,
     NODE_KIND_EXPR,
     NODE_KIND_IF,
     NODE_KIND_WHILE,
-    NODE_KIND_VAR_REASSIGN,
-    NODE_KIND_RETURN,
+    NODE_KIND_FOR,
 };
 
 enum Expr_Kind {
@@ -186,6 +192,17 @@ struct Expression {
     Expr_As as;
 };  
 
+struct PACKL_Arg {
+    Expression expr;
+};
+
+struct PACKL_Args {
+    PACKL_Arg *items;
+    size_t count;
+    size_t size;
+};
+
+
 struct Parameter {
     String_View type;
     String_View name;
@@ -204,7 +221,6 @@ struct Func_Def {
     String_View return_type;
 };
 
-
 struct Var_Reassign {
     String_View name;
     Expression expr;
@@ -219,6 +235,13 @@ struct If_Statement {
     Expression condition;
     AST *body;
     AST *esle;                    // the else part of the if statement, will be set to NULL if none is provided
+};
+
+struct For_Statement {
+    String_View iter;
+    String_View iter_type;
+    PACKL_Args args;
+    AST *body;
 };
 
 enum PACKL_Type {
@@ -238,20 +261,9 @@ struct Proc_Def {
     AST *body;
 };
 
-
-struct Func_Call_Arg {
-    Expression expr;
-};
-
-struct Func_Call_Args {
-    Func_Call_Arg *items;
-    size_t count;
-    size_t size;
-};
-
 struct Func_Call {
     String_View name;
-    Func_Call_Args args;
+    PACKL_Args args;
 };
 
 union Node_As {
@@ -262,6 +274,7 @@ union Node_As {
     Expression expr;
     If_Statement fi;
     While_Statement hwile;
+    For_Statement rof;
     Var_Reassign var;
     Expression ret;
 };

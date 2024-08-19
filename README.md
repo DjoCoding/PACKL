@@ -64,3 +64,14 @@ proc main() {
     exit(0);
 }
 ```
+
+
+## For loops
+```nim
+proc main() {
+    for i: int in (1, 10) {
+        foo();
+    }
+    exit(0);
+}
+```
