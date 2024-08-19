@@ -29,7 +29,7 @@ func sub(a: int, b: int): int {
 }
 
 func add(a: int, b: int): int {
-    foo = a + b;
+    add = a + b;
 }
 
 proc main() {
