@@ -1,5 +1,7 @@
 {
     "files.associations": {
+        "*.packl": "nim",
+        "*.pasm": "asm",
         "system_error": "c",
         "array": "c",
         "functional": "c",
@@ -7,6 +9,8 @@
         "type_traits": "c",
         "utility": "c",
         "test.C": "cpp",
-        "error.h": "c"
+        "error.h": "c",
+        "string_view": "c",
+        "initializer_list": "c"
     }
 }

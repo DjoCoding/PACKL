@@ -6,7 +6,7 @@ a very small programming language built on top of the PACKL Virtual Machine, it 
 ## Hello World 
 
 ```nim
-proc main() {P
+proc main() {
     write("Hello World\n");
     exit(0);
 }
@@ -25,11 +25,11 @@ proc main() {
 ## Functions
 ```nim
 func sub(a: int, b: int): int {
-    return a - b;
+    sub = a - b;
 }
 
 func add(a: int, b: int): int {
-    return a + b;
+    add =  a + b;
 }
 
 proc main() {
@@ -64,4 +64,3 @@ proc main() {
     exit(0);
 }
 ```
-
