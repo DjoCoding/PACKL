@@ -6,8 +6,10 @@ a very small programming language built on top of the PACKL Virtual Machine, it 
 ## Hello World 
 
 ```nim
+use "std/io.packl" as io
+
 proc main() {
-    write(0, "Hello World\n", 12);
+    io:println("Hello World");
     exit(0);
 }
 ```
