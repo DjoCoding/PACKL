@@ -82,6 +82,7 @@ proc main() {
 
 ```nim 
 use "std/io.packl" as io
+
 proc main() {
     io:println("PACKL");
     exit(0);
