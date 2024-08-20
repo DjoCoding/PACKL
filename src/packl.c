@@ -1,11 +1,26 @@
 #include "packl.h"
 
-PACKL packl_init(char *input, char *output) {
-    PACKL packl = {0};
-    packl.filename = input;
-    packl.output = output;
-    return packl;
+PACKL_Compiler packl_init(char *input, char *output) {
+    PACKL_Compiler c = {0};
+    c.output = output;
+    c.root_file = packl_init_file(input);
+    return c;
 } 
+
+void packl_generate_code(PACKL_Compiler *c) {
+    c->f = fopen(c->output, "w");
+    if(!c->f) {
+        PACKL_ERROR(c->root_file.filename, "could not open the output file for writing");
+    }    
+    codegen(c, &c->root_file);
+    fclose(c->f);
+}
+
+void packl_compile(PACKL_Compiler *c) {
+    lex(&c->root_file);
+    parse(&c->root_file);
+    packl_generate_code(c);
+}
 
 void packl_destroy_ast(AST ast);
 
@@ -77,6 +92,12 @@ void packl_destroy_for(For_Statement rof) {
     free(rof.body);
 } 
 
+void packl_destroy_mod_call(Mod_Call mod_call) {
+    if (mod_call.kind == MODULE_CALL_FUNC_CALL) {
+        packl_destroy_func_call(mod_call.as.func_call);
+    }
+}
+
 void packl_destroy_node(Node node) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -99,6 +120,10 @@ void packl_destroy_node(Node node) {
             return packl_destroy_expr(node.as.ret);
         case NODE_KIND_FOR:
             return packl_destroy_for(node.as.rof);
+        case NODE_KIND_USE:
+            return;
+        case NODE_KIND_MOD_CALL:
+            return packl_destroy_mod_call(node.as.mod_call);
         default:
             ASSERT(false, "unreachable");
     }
@@ -112,14 +137,21 @@ void packl_destroy_ast(AST ast) {
     if (ast.size != 0)  free(ast.items);
 }
 
-void packl_destroy(PACKL *self) {
+void packl_file_destroy(PACKL_File *self) {
     if (self->tokens.size != 0)        free(self->tokens.items);
     if (self->lexer.source.count != 0) free(self->lexer.source.content);    
     packl_destroy_ast(self->ast);    
+    
+    // pop the global context
+    packl_pop_context(self);
+    packl_remove_contexts(self);
+    
+    for(size_t i = 0; i < self->used_files.count; ++i) {
+        packl_file_destroy(&self->used_files.items[i]);
+        free(self->used_files.items[i].filename);
+    }
 }
 
-void packl_load_file(PACKL *self) {
-    self->lexer.source = sv_from_file(self->filename);
-    self->lexer.current = 0;
-    self->lexer.loc = (Location) {1, 1};
-} 
+void packl_destroy(PACKL_Compiler *c) {
+    packl_file_destroy(&c->root_file);
+}

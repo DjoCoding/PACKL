@@ -10,6 +10,6 @@
 #define lread    packl_lexer_read_token
 #define lex      packl_lexer_lex
 
-void packl_lexer_lex(PACKL *self);
+void packl_lexer_lex(PACKL_File *self);
 
 #endif 

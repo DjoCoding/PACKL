@@ -29,34 +29,36 @@ char *token_kinds_str[] = {
     "if",
     "else",
     "while",
+    "use",
+    "as",
 };
 
 Node packl_init_node(Node_Kind kind, Location loc) {
     return (Node) { .kind = kind, .loc = loc };
 }
 
-Expression packl_parser_parse_comparative_expr(PACKL *self);
-Expression packl_parser_parse_expr(PACKL *self);
-Node packl_parser_parse_statement(PACKL *self);
+Expression packl_parser_parse_comparative_expr(PACKL_File *self);
+Expression packl_parser_parse_expr(PACKL_File *self);
+Node packl_parser_parse_statement(PACKL_File *self);
 
-Token packl_parser_peek(PACKL *self, size_t ahead) {
+Token packl_parser_peek(PACKL_File *self, size_t ahead) {
     return self->tokens.items[self->parser.current + ahead];
 }
 
-void packl_parser_advance(PACKL *self) {
+void packl_parser_advance(PACKL_File *self) {
     self->parser.current++;
 }
 
 // get the number of tokens that can be consumed
-size_t packl_get_tokens_number(PACKL *self) {
+size_t packl_get_tokens_number(PACKL_File *self) {
     return self->tokens.count - self->parser.current;
 }
 
-bool packl_parser_eot(PACKL *self) {
+bool packl_parser_eot(PACKL_File *self) {
     return ppeek(self).kind == TOKEN_KIND_END;
 }
 
-Operator packl_get_operator(PACKL *self, Token token) {
+Operator packl_get_operator(PACKL_File *self, Token token) {
     switch(token.kind) {
         case TOKEN_KIND_PLUS:
             return OP_PLUS;
@@ -77,7 +79,7 @@ Operator packl_get_operator(PACKL *self, Token token) {
     }
 }
 
-void packl_parser_expect(PACKL *self, Token_Kind kind, Token *token) {
+void packl_parser_expect(PACKL_File *self, Token_Kind kind, Token *token) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected token of kind `%s` but end found", token_kinds_str[kind]); }
         
 
@@ -90,14 +92,14 @@ void packl_parser_expect(PACKL *self, Token_Kind kind, Token *token) {
     padv(self);
 }
 
-PACKL_Arg packl_parser_parse_arg(PACKL *self) {
+PACKL_Arg packl_parser_parse_arg(PACKL_File *self) {
     PACKL_Arg arg = {0};
     arg.expr = packl_parser_parse_expr(self);
     return arg;
 }
 
 
-PACKL_Args packl_parser_parse_args(PACKL *self) {
+PACKL_Args packl_parser_parse_args(PACKL_File *self) {
     PACKL_Args args = {0};
     DA_INIT(&args, sizeof(PACKL_Arg));
 
@@ -117,7 +119,7 @@ PACKL_Args packl_parser_parse_args(PACKL *self) {
     return args;
 }
 
-Func_Call packl_parser_parse_func_call(PACKL *self) {
+Func_Call packl_parser_parse_func_call(PACKL_File *self) {
     Func_Call func_call = {0};
     Token token = ppeek(self);
 
@@ -134,7 +136,37 @@ Func_Call packl_parser_parse_func_call(PACKL *self) {
     return func_call;
 }
 
-Parameter packl_parser_parse_param(PACKL *self) {
+Mod_Call packl_parser_parse_module_call(PACKL_File *self) {
+    Mod_Call mod_call = {0};
+
+    Token token = {0};
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    mod_call.name = token.text;
+
+    pexp(self, TOKEN_KIND_COLON, NULL);
+
+    if (packl_get_tokens_number(self) < 2) {
+        PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected more tokens after module call `" SV_FMT "`", SV_UNWRAP(mod_call.name));
+    }
+
+    if (ppeek(self).kind != TOKEN_KIND_IDENTIFIER) {
+        PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected identifier after module call `" SV_FMT "`", SV_UNWRAP(mod_call.name));
+    }
+    
+    if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
+        mod_call.kind = MODULE_CALL_FUNC_CALL;
+        mod_call.as.func_call = packl_parser_parse_func_call(self);
+        return mod_call;
+    }
+
+    mod_call.kind = MODULE_CALL_VARIABLE;
+    mod_call.as.var_name = ppeek(self).text;
+    padv(self);
+
+    return mod_call;
+}
+
+Parameter packl_parser_parse_param(PACKL_File *self) {
     Parameter param = {0};
 
     Token token = {0};
@@ -152,7 +184,7 @@ Parameter packl_parser_parse_param(PACKL *self) {
     return param;
 }
 
-Parameters packl_parser_parse_params(PACKL *self) {
+Parameters packl_parser_parse_params(PACKL_File *self) {
     Parameters params = {0};
     DA_INIT(&params, sizeof(Parameter));
 
@@ -166,7 +198,7 @@ Parameters packl_parser_parse_params(PACKL *self) {
     return params;
 }
 
-AST packl_parser_parse_body(PACKL *self) {
+AST packl_parser_parse_body(PACKL_File *self) {
     AST ast = {0};
     DA_INIT(&ast, sizeof(Node));
 
@@ -185,7 +217,7 @@ AST packl_parser_parse_body(PACKL *self) {
     return ast;
 }
 
-Proc_Def packl_parser_parse_proc_def(PACKL *self) {
+Proc_Def packl_parser_parse_proc_def(PACKL_File *self) {
     Proc_Def proc = {0};
     
     // consuming the `proc` token 
@@ -212,10 +244,10 @@ Proc_Def packl_parser_parse_proc_def(PACKL *self) {
     return proc;
 }
 
-Var_Declaration packl_parser_parse_var_dec(PACKL *self) {
+Var_Declaration packl_parser_parse_var_dec(PACKL_File *self) {
     Var_Declaration var_dec = {0};
     
-    // consuming the `var` token
+    // consuming the `var` or `const` token
     padv(self);
 
     Token token = {0};
@@ -253,6 +285,14 @@ Expression get_func_call_expr(Func_Call func) {
     expr.kind = EXPR_KIND_FUNC_CALL;
     expr.as.func = malloc(sizeof(Func_Call));
     *expr.as.func = func;
+    return expr;
+}
+
+Expression get_mod_call_expr(Mod_Call mod) {
+    Expression expr = {0};
+    expr.kind = EXPR_KIND_MOD_CALL;
+    expr.as.func = malloc(sizeof(Mod_Call));
+    *expr.as.mod = mod;
     return expr;
 }
 
@@ -304,7 +344,7 @@ int iscomparative(Token_Kind kind) {
     return false;
 }
 
-Expression packl_parser_parse_primary_expr(PACKL *self) {
+Expression packl_parser_parse_primary_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected more tokens for the expression evaluation but end found"); }
 
     Token token = ppeek(self);
@@ -325,6 +365,11 @@ Expression packl_parser_parse_primary_expr(PACKL *self) {
         if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT)  {
             Func_Call func = packl_parser_parse_func_call(self);
             return get_func_call_expr(func);
+        }
+
+        if (ppeek_(self, 1).kind == TOKEN_KIND_COLON) {
+            Mod_Call mod = packl_parser_parse_module_call(self);
+            return get_mod_call_expr(mod);
         }
 
         padv(self);
@@ -350,7 +395,7 @@ Expression packl_parser_parse_primary_expr(PACKL *self) {
     PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found when parsing expression `" SV_FMT "`", SV_UNWRAP(token.text));
 }
 
-Expression packl_parser_parse_multiplicative_expr(PACKL *self) {
+Expression packl_parser_parse_multiplicative_expr(PACKL_File *self) {
     Expression lhs = packl_parser_parse_primary_expr(self);
 
     while (!peot(self)) {
@@ -370,7 +415,7 @@ Expression packl_parser_parse_multiplicative_expr(PACKL *self) {
     return lhs;
 }
 
-Expression packl_parser_parse_additive_expr(PACKL *self) {
+Expression packl_parser_parse_additive_expr(PACKL_File *self) {
     Expression lhs = packl_parser_parse_multiplicative_expr(self);
 
     while (!peot(self)) {
@@ -390,7 +435,7 @@ Expression packl_parser_parse_additive_expr(PACKL *self) {
     return lhs;
 }
 
-Expression packl_parser_parse_comparative_expr(PACKL *self) {
+Expression packl_parser_parse_comparative_expr(PACKL_File *self) {
     Expression lhs = packl_parser_parse_additive_expr(self);
 
     while (!peot(self)) {
@@ -410,12 +455,12 @@ Expression packl_parser_parse_comparative_expr(PACKL *self) {
     return lhs;
 }
 
-Expression packl_parser_parse_expr(PACKL *self) {
+Expression packl_parser_parse_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected an expresssion but end found"); }
     return packl_parser_parse_comparative_expr(self);
 }
 
-Var_Reassign packl_parser_parse_var_reassign(PACKL *self) {
+Var_Reassign packl_parser_parse_var_reassign(PACKL_File *self) {
     Var_Reassign var = {0};
 
     Token token = {0};
@@ -429,7 +474,7 @@ Var_Reassign packl_parser_parse_var_reassign(PACKL *self) {
     return var;
 }
 
-Node packl_parser_parse_identifier(PACKL *self) {
+Node packl_parser_parse_identifier(PACKL_File *self) {
     Node node = {0};
     node.loc = ppeek(self).loc;
 
@@ -443,6 +488,12 @@ Node packl_parser_parse_identifier(PACKL *self) {
         return node;
     }
 
+    if (ppeek_(self, 1).kind == TOKEN_KIND_COLON) {
+        node.kind = NODE_KIND_MOD_CALL;
+        node.as.mod_call = packl_parser_parse_module_call(self);
+        return node;
+    }
+
     if (ppeek_(self, 1).kind == TOKEN_KIND_EQUAL) {
         node.kind = NODE_KIND_VAR_REASSIGN;
         node.as.var = packl_parser_parse_var_reassign(self);
@@ -452,7 +503,7 @@ Node packl_parser_parse_identifier(PACKL *self) {
     PACKL_ERROR(self->filename, "unexpected token found `" SV_FMT "`", SV_UNWRAP(ppeek(self).text));
 }
 
-Node packl_parser_parse_native_call(PACKL *self) {
+Node packl_parser_parse_native_call(PACKL_File *self) {
     Node node = {0};
     node.loc = ppeek(self).loc;
 
@@ -473,7 +524,7 @@ Node packl_get_node_from_if(If_Statement fi) {
     return (Node) { .kind = NODE_KIND_IF, .as.fi = fi };
 }
 
-If_Statement packl_parser_parse_if_statement(PACKL *self) {
+If_Statement packl_parser_parse_if_statement(PACKL_File *self) {
     If_Statement fi = {0};
 
     // consume the `if` token 
@@ -515,7 +566,7 @@ If_Statement packl_parser_parse_if_statement(PACKL *self) {
     return fi;
 }
 
-While_Statement packl_parser_parse_while_statement(PACKL *self) {
+While_Statement packl_parser_parse_while_statement(PACKL_File *self) {
     While_Statement hwile = {0};
 
     // consume the `while` token 
@@ -541,7 +592,7 @@ While_Statement packl_parser_parse_while_statement(PACKL *self) {
     return hwile;
 }
 
-Func_Def packl_parser_parse_func_def(PACKL *self) {
+Func_Def packl_parser_parse_func_def(PACKL_File *self) {
     Func_Def func = {0};
     
     // consuming the `func` token 
@@ -573,7 +624,7 @@ Func_Def packl_parser_parse_func_def(PACKL *self) {
     return func;
 }
 
-For_Statement packl_parser_parser_for(PACKL *self) {
+For_Statement packl_parser_parser_for(PACKL_File *self) {
     For_Statement rof = {0};
 
     pexp(self, TOKEN_KIND_FOR, NULL);
@@ -601,54 +652,78 @@ For_Statement packl_parser_parser_for(PACKL *self) {
     return rof;
 }
 
-Expression packl_parser_parse_return(PACKL *self) {
+Expression packl_parser_parse_return(PACKL_File *self) {
     pexp(self, TOKEN_KIND_RETURN, NULL);
     return packl_parser_parse_expr(self);
 }
 
-Node packl_parser_parse_proc_def_node(PACKL *self) {
+Use packl_parser_parse_module_use(PACKL_File *self) {
+    Use use = {0};
+
+    pexp(self, TOKEN_KIND_USE, NULL);   
+
+    Token token = {0};
+    pexp(self, TOKEN_KIND_STRING_LIT, &token);
+    use.filename = token.text;
+
+    pexp(self, TOKEN_KIND_AS, NULL);
+
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    use.alias = token.text;
+    use.has_alias = 1;
+
+    return use;
+}
+
+Node packl_parser_parse_proc_def_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_PROC_DEF, ppeek(self).loc);
     node.as.proc_def = packl_parser_parse_proc_def(self);
     return node;
 }
 
-Node packl_parser_parse_var_dec_node(PACKL *self) {
+Node packl_parser_parse_var_dec_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_VAR_DECLARATION, ppeek(self).loc);
     node.as.var_dec = packl_parser_parse_var_dec(self);
     return node;
 }
 
-Node packl_parser_parse_if_node(PACKL *self) {
+Node packl_parser_parse_if_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_IF, ppeek(self).loc);
     node.as.fi = packl_parser_parse_if_statement(self);
     return node;
 }
 
-Node packl_parser_parse_while_node(PACKL *self) {
+Node packl_parser_parse_while_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_WHILE, ppeek(self).loc);
     node.as.hwile = packl_parser_parse_while_statement(self);
     return node;
 }
 
-Node packl_parser_parse_func_def_node(PACKL *self) {
+Node packl_parser_parse_func_def_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_FUNC_DEF, ppeek(self).loc);
     node.as.func_def = packl_parser_parse_func_def(self);
     return node;
 }
 
-Node packl_parser_parse_return_node(PACKL *self) {
+Node packl_parser_parse_return_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_RETURN, ppeek(self).loc);
     node.as.ret = packl_parser_parse_return(self);
     return node;
 }
 
-Node packl_parser_parse_for_node(PACKL *self) {
+Node packl_parser_parse_for_node(PACKL_File *self) {
     Node node = packl_init_node(NODE_KIND_FOR, ppeek(self).loc);
     node.as.rof = packl_parser_parser_for(self);
     return node;
 }
 
-Node packl_parser_parse_statement(PACKL *self) {
+Node packl_parser_parse_use_node(PACKL_File *self) {
+    Node node = packl_init_node(NODE_KIND_USE, ppeek(self).loc);
+    node.as.use = packl_parser_parse_module_use(self);
+    return node;
+}
+
+Node packl_parser_parse_statement(PACKL_File *self) {
     switch(ppeek(self).kind) {
         case TOKEN_KIND_NATIVE:
             return packl_parser_parse_native_call(self);
@@ -668,12 +743,14 @@ Node packl_parser_parse_statement(PACKL *self) {
             return packl_parser_parse_return_node(self);
         case TOKEN_KIND_FOR:
             return packl_parser_parse_for_node(self);
+        case TOKEN_KIND_USE:
+            return packl_parser_parse_use_node(self);
         default:
             PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found at the beginning of a statement `" SV_FMT "`", SV_UNWRAP(ppeek(self).text));
     }
 }
 
-AST packl_parser_parse_statements(PACKL *self) {
+AST packl_parser_parse_statements(PACKL_File *self) {
     AST ast = {0};
     DA_INIT(&ast, sizeof(Node));
 
@@ -686,6 +763,6 @@ AST packl_parser_parse_statements(PACKL *self) {
     return ast;
 }
 
-void packl_parser_parse(PACKL *self) {
+void packl_parser_parse(PACKL_File *self) {
     self->ast = packl_parser_parse_statements(self);
 }

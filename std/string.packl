@@ -1,0 +1,13 @@
+func len(s: str): int {
+    var i: int = 0;
+    var current: int = 0;
+    var notstop: int = 1;
+
+    while(notstop) {
+        current = get_byte(s, i);
+        if (current) { i = i + 1; }
+        else { notstop = 0; }
+    }
+    
+    len = i;
+}

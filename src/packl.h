@@ -9,9 +9,10 @@
 #include "packl-context.h"
 #include "packl-printer.h"
 
-PACKL packl_init(char *input, char *output);
-void packl_load_file(PACKL *self);
-void packl_destroy(PACKL *self);
+#define compile packl_compile
 
+PACKL_Compiler packl_init(char *input, char *output);
+void packl_destroy(PACKL_Compiler *c);
+void packl_compile(PACKL_Compiler *c);
 
 #endif 

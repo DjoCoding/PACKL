@@ -46,6 +46,8 @@ char *keywords[] = {
     "while",
     "for",
     "in",
+    "use",
+    "as",
 };
 
 char *natives[] = {
@@ -64,13 +66,15 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_WHILE,
     TOKEN_KIND_FOR,
     TOKEN_KIND_IN,
+    TOKEN_KIND_USE,
+    TOKEN_KIND_AS,
 };
 
-char packl_lexer_peek(PACKL *self) {
+char packl_lexer_peek(PACKL_File *self) {
     return (self->lexer.source.content[self->lexer.current]);
 }
 
-void packl_lexer_advance(PACKL *self) {
+void packl_lexer_advance(PACKL_File *self) {
     char current = lpeek(self);
 
     if (current == '\n') { self->lexer.loc.line++; self->lexer.loc.col = 1; }
@@ -79,11 +83,11 @@ void packl_lexer_advance(PACKL *self) {
     self->lexer.current++;
 }
 
-bool packl_lexer_eof(PACKL *self) {
+bool packl_lexer_eof(PACKL_File *self) {
     return (self->lexer.source.count <= self->lexer.current);
 }
 
-Token packl_lexer_lex_string(PACKL *self) {
+Token packl_lexer_lex_string(PACKL_File *self) {
     Token token = {0};
     token.loc = self->lexer.loc;
 
@@ -111,7 +115,7 @@ Token packl_lexer_lex_string(PACKL *self) {
     return token;
 }
 
-Token packl_lexer_lex_id(PACKL *self) {
+Token packl_lexer_lex_id(PACKL_File *self) {
     Token token = {0};
     token.loc = self->lexer.loc;
 
@@ -149,7 +153,7 @@ Token packl_lexer_lex_id(PACKL *self) {
     return token;
 }
 
-Token packl_lexer_lex_number(PACKL *self) {
+Token packl_lexer_lex_number(PACKL_File *self) {
     Token token = {0};
     token.loc = self->lexer.loc;
 
@@ -168,7 +172,7 @@ Token packl_lexer_lex_number(PACKL *self) {
     return token;
 }
 
-Token packl_lexer_read_token(PACKL *self) {
+Token packl_lexer_read_token(PACKL_File *self) {
     Token token = {0};
     token.loc = self->lexer.loc;
 
@@ -198,7 +202,7 @@ Token packl_lexer_read_token(PACKL *self) {
     PACKL_ERROR_LOC(self->filename, token.loc, "failed to identify the char `%c`", *current);
 }
 
-void packl_lexer_lex(PACKL *self) {
+void packl_lexer_lex(PACKL_File *self) {
     DA_INIT(&self->tokens, sizeof(Token));
     while (!leof(self)) {
         if (isspace(lpeek(self))) { ladv(self); continue; }

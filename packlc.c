@@ -37,6 +37,23 @@ char *flags[] = {
 
 uint8_t config[COUNT_FLAGS] = {0};
 
+void handle_flags(Args *args, char *program, char **output) {
+    while (!args_end(args)) {
+        char *flag = args_shift(args);
+        if (*flag == '-') {
+            flag++;
+            for (size_t i = 0; i < ARR_SIZE(flags); ++i) {
+                if (strcmp(flag, flags[i]) == 0) { if (config[i]) { usage(program); THROW_ERROR("flag %s is already enabled", flag); } else { config[i] = 1; break; } }
+                if (strcmp(flag, "out")) { continue; }
+                if (args_end(args)) { usage(program); THROW_ERROR("no output file path provided"); }
+                *output = args_shift(args);
+                break;
+            }
+            
+        } else { THROW_ERROR("invalid flag %s", flag); }   
+    }
+}
+
 int main(int argc, char **argv) {
     Args args = { argv, argc };
 
@@ -48,40 +65,23 @@ int main(int argc, char **argv) {
     if (args_end(&args)) { usage(program); THROW_ERROR("no input file path provided"); }
     input_filepath = args_shift(&args);
 
-    while (!args_end(&args)) {
-        char *flag = args_shift(&args);
-        if (*flag == '-') {
-            flag++;
-            for (size_t i = 0; i < ARR_SIZE(flags); ++i) {
-                if (strcmp(flag, flags[i]) == 0) { if (config[i]) { usage(program); THROW_ERROR("flag %s is already enabled", flag); } else { config[i] = 1; break; } }
-                if (strcmp(flag, "out")) { continue; }
-                if (args_end(&args)) { usage(program); THROW_ERROR("no output file path provided"); }
-                output_filepath = args_shift(&args);
-                break;
-            }
-            
-        } else { THROW_ERROR("invalid flag %s", flag); }   
-    }
-
+    handle_flags(&args, program, &output_filepath);
 
     if (!output_filepath) { output_filepath = "a.out"; }
 
-    PACKL packl = packl_init(input_filepath, output_filepath);
-    packl_load_file(&packl);
+    PACKL_Compiler c = packl_init(input_filepath, output_filepath);
 
     if (config[LEX]) {
-        lex(&packl);
-        packl_print_tokens(packl.tokens);
+        lex(&c.root_file);
+        packl_print_tokens(c.root_file.tokens);
     } else if (config[PARSE]) {
-        lex(&packl);
-        parse(&packl);
-        packl_print_ast(packl.ast);
+        lex(&c.root_file);
+        parse(&c.root_file);
+        packl_print_ast(c.root_file.ast);
     } else if (config[CODE]) {
-        lex(&packl);
-        parse(&packl);
-        codegen(&packl);
+        compile(&c);
     }
 
-    packl_destroy(&packl);
+    packl_destroy(&c);
     return 0;
 }

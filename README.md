@@ -7,7 +7,7 @@ a very small programming language built on top of the PACKL Virtual Machine, it 
 
 ```nim
 proc main() {
-    write("Hello World\n");
+    write(0, "Hello World\n", 12);
     exit(0);
 }
 ```
@@ -52,7 +52,7 @@ proc main() {
 }
 ```
 
-## While loops
+## While Loops
 
 ```nim
 proc main() {
@@ -66,7 +66,7 @@ proc main() {
 ```
 
 
-## For loops
+## For Loops
 ```nim
 proc main() {
     for i: int in (1, 10) {
@@ -74,4 +74,15 @@ proc main() {
     }
     exit(0);
 }
+```
+
+## External Files Importing
+
+```nim 
+use "std/io.packl" as io
+proc main() {
+    io:println("PACKL");
+    exit(0);
+}
+
 ```

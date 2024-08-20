@@ -4,10 +4,12 @@
 #include "packl-defs.h"
 #include "packl-error.h"
 #include "packl-context.h"
+#include "packl-lexer.h"
+#include "packl-parser.h"
 
-#define codegen packl_generate_code
+#define codegen packl_generate_file_code
 
-
-void packl_generate_code(PACKL *self);
+PACKL_File packl_init_file(char *filename);
+void packl_generate_file_code(PACKL_Compiler *c, PACKL_File *self);
 
 #endif 

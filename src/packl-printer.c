@@ -33,10 +33,13 @@ char *token_kinds[] = {
     "while",
     "for",
     "in",
+    "use",
+    "as",
 
     "end",
 };
 
+void packl_print_mod_call(Mod_Call mod_call, size_t indent);
 void packl_print_func_call(Func_Call func_call, size_t indent);
 void packl_print_ast_nodes(AST ast, size_t indent);
 
@@ -109,6 +112,8 @@ void packl_print_expr(Expression expr, size_t indent) {
         packl_print_expr(*expr.as.bin.rhs, indent + 2);
     } else if (expr.kind == EXPR_KIND_NATIVE_CALL) {
         packl_print_func_call(*expr.as.func, indent);
+    } else if (expr.kind == EXPR_KIND_MOD_CALL) {
+        packl_print_mod_call(*expr.as.mod, indent);
     } else { ASSERT(false, "unreachable"); }
 }
 
@@ -217,6 +222,24 @@ void packl_print_for(For_Statement rof, size_t indent) {
     packl_print_body(*rof.body, indent + 1);
 }
 
+void packl_print_use(Use use, size_t indent) {
+    print_indent(indent);
+    printf("file `" SV_FMT "`\n", SV_UNWRAP(use.filename));
+    print_indent(indent);
+    printf("alias: `" SV_FMT "`\n", SV_UNWRAP(use.alias));
+}
+
+void packl_print_mod_call(Mod_Call mod_call, size_t indent) {
+    print_indent(indent);
+    printf("alias `" SV_FMT "`\n", SV_UNWRAP(mod_call.name));
+    if (mod_call.kind == MODULE_CALL_FUNC_CALL) {
+        packl_print_func_call(mod_call.as.func_call, indent + 1);
+    } else {
+        print_indent(indent + 1);
+        printf("kind: variable, name: `" SV_FMT "`\n", SV_UNWRAP(mod_call.as.var_name));
+    }
+}
+
 void packl_print_var_reassign(Var_Reassign var, size_t indent) {
     print_indent(indent);
     printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var.name));
@@ -297,6 +320,18 @@ void packl_print_for_node(Node node, size_t indent) {
     packl_print_for(node.as.rof, indent + 1);
 }
 
+void packl_print_use_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: use\n");
+    packl_print_use(node.as.use, indent + 1);
+}
+
+void packl_print_mod_call_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: module call\n");
+    packl_print_mod_call(node.as.mod_call, indent + 1);
+}
+
 void packl_print_ast_node(Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -319,6 +354,10 @@ void packl_print_ast_node(Node node, size_t indent) {
             return packl_print_return_node(node, indent);
         case NODE_KIND_FOR:
             return packl_print_for_node(node, indent);
+        case NODE_KIND_USE:
+            return packl_print_use_node(node, indent);
+        case NODE_KIND_MOD_CALL:
+            return packl_print_mod_call_node(node, indent);
         default:
             ASSERT(false, "unreachable");
     }

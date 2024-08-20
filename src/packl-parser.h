@@ -13,7 +13,7 @@
 #define pstmt                           packl_parser_parse_statement
 #define parse                           packl_parser_parse
 
-void packl_parser_parse(PACKL *self);
+void packl_parser_parse(PACKL_File *self);
 
 
 #endif 

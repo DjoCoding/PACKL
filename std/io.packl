@@ -1,0 +1,11 @@
+use "string.packl" as string
+
+proc print(s: str) {
+    var length: int = string:len(s);
+    write(0, s, length);
+}
+
+proc println(s: str) {
+    print(s);
+    write(0, "\n", 1);
+}

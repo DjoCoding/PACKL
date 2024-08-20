@@ -9,6 +9,12 @@ typedef struct {
     size_t col;
 } Location;
 
+typedef struct {
+    char **items;
+    size_t count;
+    size_t size;
+} Strings;
+
 #define LOC_FMT          "(%zu, %zu)"
 #define LOC_UNWRAP(loc)  loc.line, loc.col
 
@@ -33,6 +39,9 @@ typedef struct Func_Def Func_Def;
 
 // procedure defintion
 typedef struct Proc_Def Proc_Def;
+
+// module 
+typedef struct Use Use;
 
 // expression
 typedef enum Operator Operator;
@@ -63,6 +72,11 @@ typedef struct Var_Declaration Var_Declaration;
 // variable reassignement
 typedef struct Var_Reassign Var_Reassign;
 
+// module call
+typedef enum Mod_Call_Kind Mod_Call_Kind;
+typedef union Mod_Call_As Mod_Call_As;
+typedef struct Mod_Call Mod_Call;
+
 // Nodes 
 typedef enum Node_Kind Node_Kind;
 typedef union Node_As Node_As;
@@ -71,6 +85,7 @@ typedef struct Node Node;
 typedef struct AST AST;
 
 // Context 
+typedef struct Module Module;
 typedef struct Function Function;
 typedef struct Variable Variable;
 typedef struct Procedure Procedure;
@@ -80,8 +95,10 @@ typedef struct Context_Item Context_Item;
 typedef struct Context Context;
 typedef struct Contexts Contexts;
 
-
-typedef struct PACKL PACKL;
+// Files 
+typedef struct PACKL_File PACKL_File;
+typedef struct PACKL_External_Files PACKL_External_Files;
+typedef struct PACKL_Compiler PACKL_Compiler;
 
 enum Token_Kind {
     TOKEN_KIND_IDENTIFIER = 0,
@@ -117,6 +134,8 @@ enum Token_Kind {
     TOKEN_KIND_WHILE,
     TOKEN_KIND_FOR,
     TOKEN_KIND_IN,
+    TOKEN_KIND_USE,
+    TOKEN_KIND_AS,
 
     TOKEN_KIND_END,
 
@@ -154,6 +173,8 @@ enum Node_Kind {
     NODE_KIND_IF,
     NODE_KIND_WHILE,
     NODE_KIND_FOR,
+    NODE_KIND_USE,
+    NODE_KIND_MOD_CALL,
 };
 
 enum Expr_Kind {
@@ -163,6 +184,7 @@ enum Expr_Kind {
     EXPR_KIND_ID,
     EXPR_KIND_FUNC_CALL,
     EXPR_KIND_NATIVE_CALL,
+    EXPR_KIND_MOD_CALL,
     EXPR_KIND_NOT_INITIALIZED,
 };
 
@@ -185,6 +207,7 @@ union Expr_As {
     Expr_Bin_Op bin;
     String_View value;
     Func_Call *func;
+    Mod_Call *mod;
 };
 
 struct Expression {
@@ -266,6 +289,28 @@ struct Func_Call {
     PACKL_Args args;
 };
 
+struct Use {
+    String_View filename;
+    String_View alias;
+    int has_alias;
+};
+
+enum Mod_Call_Kind {
+    MODULE_CALL_FUNC_CALL = 0,
+    MODULE_CALL_VARIABLE,
+};
+
+union Mod_Call_As {
+    Func_Call func_call;
+    String_View var_name;
+};
+
+struct Mod_Call {
+    String_View name;
+    Mod_Call_Kind kind;
+    Mod_Call_As as;
+};
+
 union Node_As {
     Func_Call func_call;
     Proc_Def proc_def;
@@ -277,6 +322,8 @@ union Node_As {
     For_Statement rof;
     Var_Reassign var;
     Expression ret;
+    Use use;
+    Mod_Call mod_call;
 };
 
 struct Node {
@@ -311,16 +358,22 @@ struct Function {
     String_View return_type;
 };
 
+struct Module {
+    char *filename;
+};
+
 enum Context_Item_Type {
     CONTEXT_ITEM_TYPE_PROCEDURE = 0,
     CONTEXT_ITEM_TYPE_VARIABLE,
     CONTEXT_ITEM_TYPE_FUNCTION,
+    CONTEXT_ITEM_TYPE_MODULE,
 };
 
 union Context_Item_As {
     Procedure proc;
     Variable variable;
     Function func;
+    Module module;
 };
 
 struct Context_Item {
@@ -342,10 +395,14 @@ struct Contexts {
     size_t size;
 };
 
-struct PACKL {
+struct PACKL_External_Files {
+    PACKL_File *items;
+    size_t count;
+    size_t size;
+};
+
+struct PACKL_File {
     char *filename;
-    char *output;
-    
     Tokens tokens;
     AST ast;
 
@@ -354,8 +411,19 @@ struct PACKL {
 
     Contexts contexts;
 
+    Strings root_files;
+    PACKL_External_Files used_files;
+};
+
+struct PACKL_Compiler {
+    char *output;    
+    FILE *f;
+    char *entry_file_path;
+    bool has_entry;
+    PACKL_File root_file;
     size_t label_value;
     size_t stack_size;
 };
+
 
 #endif
