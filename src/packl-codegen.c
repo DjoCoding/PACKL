@@ -1,8 +1,11 @@
 #include "packl-codegen.h"
 
+size_t data_type_size[COUNT_PACKL_TYPES] = {4, 8};
+
 PACKL_File packl_init_file(char *filename);
 void packl_compile_file(PACKL_Compiler *c, PACKL_File *self);
 
+void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_Type type, size_t indent);
 void packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression expr, size_t indent);
 void packl_generate_func_call_node(PACKL_Compiler *c, PACKL_File *self, Node caller, Function func, size_t indent);
 void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent);
@@ -195,16 +198,16 @@ void packl_generate_ret(PACKL_Compiler *c, size_t indent) {
     fprintf(c->f, "ret\n");
 }
 
-void packl_generate_str(PACKL_Compiler *c, size_t indent) {
+void packl_generate_store(PACKL_Compiler *c, size_t indent) {
     fprint_indent(c->f, indent);
-    fprintf(c->f, "str\n");
+    fprintf(c->f, "store\n");
     c->stack_size -= 3;
 }
 
 void packl_generate_load(PACKL_Compiler *c, size_t indent) {
     fprint_indent(c->f, indent);
     fprintf(c->f, "load\n");
-    c->stack_size -= 2;
+    c->stack_size -= 1;
 }
 
 void packl_generate_readc(PACKL_Compiler *c, size_t indent) {
@@ -218,7 +221,7 @@ void packl_generate_loadb(PACKL_Compiler *c, size_t indent) {
     fprintf(c->f, "loadb\n");
 }
 
-void packl_generate_strb(PACKL_Compiler *c, size_t indent) {
+void packl_generate_storeb(PACKL_Compiler *c, size_t indent) {
     fprint_indent(c->f, indent);
     fprintf(c->f, "strb\n");
     c->stack_size -= 2;
@@ -291,7 +294,7 @@ void packl_generate_binop_call_expr_code(PACKL_Compiler *c, PACKL_File *self, Ex
     packl_generate_operation_code(c, binop.op, indent);
 }
 
-void packl_generate_string_expr_code(PACKL_Compiler *c, PACKL_File *self, String_View value, size_t indent) {
+void packl_generate_storeing_expr_code(PACKL_Compiler *c, PACKL_File *self, String_View value, size_t indent) {
     packl_generate_pushs(c, value, indent);
 } 
 
@@ -327,10 +330,42 @@ void packl_generate_mod_call_expr_code(PACKL_Compiler *c, PACKL_File *self, Mod_
     ASSERT(false, "unreachable");
 }
 
+void packl_generate_array_indexing_code(PACKL_Compiler *c, PACKL_File *self, Expr_Arr_Index arr_index, size_t indent) {
+    Variable var = packl_find_variable(self, arr_index.name, (Location){0,0});
+    
+    if (var.type.kind != PACKL_TYPE_ARRAY) {
+        PACKL_ERROR(self->filename, SV_FMT " is not an array", SV_UNWRAP(arr_index.name));
+    }
+
+    PACKL_COMMENT(c->f, indent, "this is for the array indexing");
+
+    // push the item size
+    packl_generate_array_item_size(c, self, *var.type.as.array.type, indent);
+
+    // push the array
+    packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
+
+    // push the index
+    packl_generate_expr_code(c, self, *arr_index.index, indent);
+
+    // indup the item size
+    packl_generate_indup(c, 2, indent);
+
+    // multiply them together
+    packl_generate_mul(c, indent);
+
+    // add 
+    packl_generate_add(c, indent);
+
+    packl_generate_swap(c, indent);
+
+    packl_generate_load(c, indent);
+}
+
 void packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression expr, size_t indent) {
     switch(expr.kind) {
         case EXPR_KIND_INTEGER:
-            return packl_generate_integer_expr_code(c, integer_from_sv(expr.as.value), indent);
+            return packl_generate_integer_expr_code(c, expr.as.integer, indent);
         case EXPR_KIND_ID:
             return packl_generate_identifier_expr_code(c, self, expr.as.value, indent);
         case EXPR_KIND_FUNC_CALL:
@@ -338,11 +373,13 @@ void packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression ex
         case EXPR_KIND_BIN_OP:
             return packl_generate_binop_call_expr_code(c, self, expr.as.bin, indent);
         case EXPR_KIND_STRING:
-            return packl_generate_string_expr_code(c, self, expr.as.value, indent);
+            return packl_generate_storeing_expr_code(c, self, expr.as.value, indent);
         case EXPR_KIND_NATIVE_CALL:
             return packl_generate_native_call_code(c, self, *expr.as.func, indent);
         case EXPR_KIND_MOD_CALL:
             return packl_generate_mod_call_expr_code(c, self, *expr.as.mod, indent);
+        case EXPR_KIND_ARRAY_INDEXING:
+            return packl_generate_array_indexing_code(c, self, expr.as.arr_index, indent);
         default:
             ASSERT(false, "unreachable");
     }
@@ -381,6 +418,94 @@ void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc
     packl_generate_ret(c, indent + 1);
 }
 
+void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_Type type, size_t indent) {
+    if(type.kind == PACKL_TYPE_BASIC) {
+        packl_generate_push(c, data_type_size[type.as.basic], indent);
+        return;
+    }
+
+    if (type.kind == PACKL_TYPE_ARRAY) {
+        // push the single item size
+        packl_generate_array_item_size(c, self, *type.as.array.type, indent);
+        // push the size of the array
+        packl_generate_expr_code(c, self, type.as.array.size, indent);
+        // multiply them
+        packl_generate_mul(c, indent);
+        return;
+    }
+
+    ASSERT(false, "unreachable");
+}
+
+void packl_generate_array_allocation_code(PACKL_Compiler *c, PACKL_File *self, Array_Type arr_type, size_t indent) {
+    packl_generate_array_item_size(c, self, *arr_type.type, indent);
+    packl_generate_expr_code(c, self, arr_type.size, indent);
+    packl_generate_mul(c, indent);
+    packl_generate_syscall(c, 2, indent); // the alloc syscall
+}
+
+void packl_generate_write_array_value_code(PACKL_Compiler *c, PACKL_File *self, PACKL_Type arr_type, Expression value, Expression index, size_t indent) {   
+    // example: arr[2] = 1; arr is a array of integers
+    // stack: arr
+
+    // duplicate the array pointer
+    packl_generate_dup(c, indent);
+    // stack: arr arr
+
+    // generate the push of the data type size
+    packl_generate_array_item_size(c, self, *arr_type.as.array.type, indent);
+    // stack: arr arr sizeof(int)
+
+    packl_generate_swap(c, indent);
+    // stack: arr sizeof(int) arr
+
+    // duplicate the array item size because we need it 
+    packl_generate_indup(c, 1, indent);
+    // stack: arr sizeof(int) arr sizeof(int)
+
+    // generate the index
+    packl_generate_expr_code(c, self, index, indent);
+    // stack: arr sizeof(int) arr sizeof(int) 2
+
+    // multiply the index with the item_size 
+    packl_generate_mul(c, indent);
+    // stack: arr sizeof(int) arr (2*sizeof(int))
+
+    // add the offset to the array pointer 
+    packl_generate_add(c, indent);
+    // stack: arr sizeof(int) (arr + 2 * sizeof(int))
+
+    // generate a swap
+    packl_generate_swap(c, indent);
+    // stack: arr (arr + 2 * sizeof(int)) sizeof(int)
+
+    // push the data 
+    packl_generate_expr_code(c, self, value, indent);
+    // stack: arr (arr + 2 * sizeof(int)) sizeof(int) 1
+
+    // generate another swap
+    packl_generate_swap(c, indent);
+    // stack: arr (arr + 2 * sizeof(int)) 1 sizeof(int)
+
+    // ready for the storing
+    packl_generate_store(c, indent);
+    // stack: arr 
+}
+
+void packl_handle_array_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declaration var_dec, size_t indent) {
+    PACKL_Type arr_type = var_dec.type;
+    // allocate the memory for the array
+    packl_generate_array_allocation_code(c, self, arr_type.as.array, indent);
+
+    // write values to that memory
+    Expr_Arr arr = var_dec.value.as.arr;
+    for(size_t i = 0; i < arr.count; ++i) {
+        // index for the push 
+        Expression index = { .kind = EXPR_KIND_INTEGER, .as.integer = (int64_t)i };
+        packl_generate_write_array_value_code(c, self, arr_type, arr.items[i], index, indent);
+    }
+}
+
 void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_dec_node, size_t indent) {
     Var_Declaration var_dec = var_dec_node.as.var_dec;
     packl_find_item_in_current_context_and_report_error_if_found(self, var_dec.name, var_dec_node.loc);
@@ -388,7 +513,17 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
     Context_Item new_var = packl_init_var_context_item(var_dec.name, var_dec.type, c->stack_size);
     packl_push_item_in_current_context(self, new_var);
     
-    packl_generate_expr_code(c, self, var_dec.value, indent);
+    if (var_dec.type.kind == PACKL_TYPE_BASIC) {
+        return packl_generate_expr_code(c, self, var_dec.value, indent);
+    }
+
+    if (var_dec.type.kind == PACKL_TYPE_ARRAY) {
+        return packl_handle_array_var_dec(c, self, var_dec, indent);
+    }
+
+
+    ASSERT(false, "unreachable");
+
 }
 
 void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node var_reassign_node, size_t indent) {
@@ -681,7 +816,8 @@ void packl_generate_for_node(PACKL_Compiler *c, PACKL_File *self, Node for_node,
 
     packl_generate_label(c, label + 1, indent);
 
-    c->stack_size = stack_size;
+    packl_pop_proc_scope(c, stack_size, indent);
+    // c->stack_size = stack_size;
 
     packl_pop_context(self);
 }
@@ -723,7 +859,7 @@ void packl_generate_use_node(PACKL_Compiler *c, PACKL_File *self, Node use_node,
     packl_push_item_in_current_context(self, new_module);
 
     PACKL_File file = packl_init_file(filename);
-    
+
     packl_set_root_files(&file, self->root_files, self->filename);
 
     packl_compile_file(c, &file);

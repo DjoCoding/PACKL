@@ -11,6 +11,8 @@ char *token_kinds[] = {
     ":",
     ",",
 
+    "[",
+    "]",
     "(",
     ")",
     "{",
@@ -35,10 +37,14 @@ char *token_kinds[] = {
     "in",
     "use",
     "as",
+    "array",
+    "type-int",
+    "type-str",
 
     "end",
 };
 
+void packl_print_expr(Expression expr, size_t indent);
 void packl_print_mod_call(Mod_Call mod_call, size_t indent);
 void packl_print_func_call(Func_Call func_call, size_t indent);
 void packl_print_ast_nodes(AST ast, size_t indent);
@@ -93,13 +99,72 @@ void packl_print_tokens(Tokens toks) {
     }
 }
 
+void packl_print_basic_type(Type type, size_t indent) {
+    print_indent(indent);
+    if(type == PACKL_TYPE_INT) {
+        printf("int-type\n");
+        return;
+    }
+
+    if (type == PACKL_TYPE_STR) {
+        printf("str-type\n");
+        return;
+    }
+
+    ASSERT(false, "unreachable");
+}
+
+void packl_print_type(PACKL_Type type, size_t indent);
+
+void packl_print_array_type(Array_Type type, size_t indent) {
+    print_indent(indent);
+    printf("type: array\n");
+    packl_print_type(*type.type, indent + 1);
+    print_indent(indent);
+    printf("size:\n");
+    packl_print_expr(type.size, indent + 1);
+}
+
+void packl_print_type(PACKL_Type type, size_t indent) {
+    if(type.kind == PACKL_TYPE_BASIC) {
+        packl_print_basic_type(type.as.basic, indent);
+        return;
+    }
+
+
+    if (type.kind == PACKL_TYPE_ARRAY) {
+        packl_print_array_type(type.as.array, indent);
+        return;
+    }
+
+    ASSERT(false, "unreachable");
+}
+
+void packl_print_expr_arr(Expr_Arr exprs, size_t indent) {
+    print_indent(indent);
+    printf("array:\n");
+    for(size_t i = 0; i < exprs.count; ++i) {
+        packl_print_expr(exprs.items[i], indent + 1);
+    }
+}
+
+void packl_print_expr_arr_index(Expr_Arr_Index arr_index, size_t indent) {
+    print_indent(indent);
+    printf("array indexing:\n");
+
+    print_indent(indent + 1);
+    printf("array name: `" SV_FMT "`\n", SV_UNWRAP(arr_index.name));
+
+    packl_print_expr(*arr_index.index, indent + 1);
+}
+
 void packl_print_expr(Expression expr, size_t indent) {
     if (expr.kind == EXPR_KIND_STRING) {
         print_indent(indent);
         printf("string: \"" SV_FMT "\"\n", SV_UNWRAP(expr.as.value));
     } else if (expr.kind == EXPR_KIND_INTEGER) {
         print_indent(indent);
-        printf("integer: " SV_FMT "\n", SV_UNWRAP(expr.as.value));
+        printf("integer: %ld\n", expr.as.integer);
     } else if (expr.kind == EXPR_KIND_ID) {
         print_indent(indent);
         printf("identifier: `" SV_FMT "`\n", SV_UNWRAP(expr.as.value));
@@ -114,6 +179,10 @@ void packl_print_expr(Expression expr, size_t indent) {
         packl_print_func_call(*expr.as.func, indent);
     } else if (expr.kind == EXPR_KIND_MOD_CALL) {
         packl_print_mod_call(*expr.as.mod, indent);
+    } else if (expr.kind == EXPR_KIND_ARRAY) {
+        packl_print_expr_arr(expr.as.arr, indent);
+    } else if (expr.kind == EXPR_KIND_ARRAY_INDEXING) {
+        packl_print_expr_arr_index(expr.as.arr_index, indent);
     } else { ASSERT(false, "unreachable"); }
 }
 
@@ -145,7 +214,9 @@ void packl_print_func_call(Func_Call func_call, size_t indent) {
 void packl_print_param(Parameter param, size_t indent) {
     print_indent(indent);
     printf("name: `" SV_FMT "`", SV_UNWRAP(param.name));
-    printf(", type: `" SV_FMT "` \n", SV_UNWRAP(param.type));
+    print_indent(indent);
+    printf("type:\n");
+    packl_print_type(param.type, indent);
 }
 
 void packl_print_params(Parameters params, size_t indent) {
@@ -182,7 +253,8 @@ void packl_print_var_dec(Var_Declaration var_dec, size_t indent) {
     printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var_dec.name));
 
     print_indent(indent);
-    printf("variable type: `" SV_FMT "`\n", SV_UNWRAP(var_dec.type));
+    printf("variable type:\n");
+    packl_print_type(var_dec.type, indent + 1);
 
     print_indent(indent);
     printf("value:\n");
@@ -217,7 +289,10 @@ void packl_print_while(While_Statement hwile, size_t indent) {
 
 void packl_print_for(For_Statement rof, size_t indent) {
     print_indent(indent);
-    printf("iterator: `" SV_FMT "`, type: `" SV_FMT "`\n", SV_UNWRAP(rof.iter), SV_UNWRAP(rof.iter_type));
+    printf("iterator: `" SV_FMT "`",  SV_UNWRAP(rof.iter));
+    print_indent(indent);
+    printf("type:\n");
+    packl_print_type(rof.iter_type, indent);
     packl_print_args(rof.args, indent + 1);
     packl_print_body(*rof.body, indent + 1);
 }
@@ -254,8 +329,8 @@ void packl_print_func_def(Func_Def func, size_t indent) {
     printf("function name: `" SV_FMT "`\n", SV_UNWRAP(func.name));
 
     print_indent(indent);
-    printf("return type: `" SV_FMT "`\n", SV_UNWRAP(func.return_type));
-
+    printf("return type\n");
+    packl_print_type(func.return_type, indent);
     packl_print_body(*func.body, indent + 1);
 }
 

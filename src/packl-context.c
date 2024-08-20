@@ -77,14 +77,14 @@ Parameters packl_copy_params(Parameters params) {
     return out;
 }
 
-Variable packl_init_context_variable(String_View type, size_t pos) {
+Variable packl_init_context_variable(PACKL_Type type, size_t pos) {
     Variable var = {0};
     var.stack_pos = pos;
     var.type = type;
     return var;
 }
 
-Function packl_init_context_function(String_View return_type, Parameters params, size_t label_value) {
+Function packl_init_context_function(PACKL_Type return_type, Parameters params, size_t label_value) {
     Function func = {0};
     func.label_value = label_value;
     func.params = packl_copy_params(params);
@@ -105,12 +105,12 @@ Module packl_init_context_module(char *filename) {
     return module;
 }
 
-Context_Item packl_init_var_context_item(String_View name, String_View type, size_t pos) {
-    Variable var = packl_init_context_variable(type,pos);
+Context_Item packl_init_var_context_item(String_View name, PACKL_Type type, size_t pos) {
+    Variable var = packl_init_context_variable(type, pos);
     return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_VARIABLE, .as.variable = var };
 } 
 
-Context_Item packl_init_func_context_item(String_View name, String_View return_type, Parameters params, size_t label_value) {
+Context_Item packl_init_func_context_item(String_View name, PACKL_Type return_type, Parameters params, size_t label_value) {
     Function func = packl_init_context_function(return_type, params, label_value);
     return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_FUNCTION, .as.func = func };
 }

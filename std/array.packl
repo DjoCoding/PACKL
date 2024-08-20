@@ -1,0 +1,6 @@
+func sum(nums: array(int, 5)): int {
+    sum = 0;
+    for i: int in (0, 4) {
+        sum = sum + nums[i];
+    }
+}

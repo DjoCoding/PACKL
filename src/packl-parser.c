@@ -37,6 +37,7 @@ Node packl_init_node(Node_Kind kind, Location loc) {
     return (Node) { .kind = kind, .loc = loc };
 }
 
+PACKL_Type packl_parser_parse_type(PACKL_File *self);
 Expression packl_parser_parse_comparative_expr(PACKL_File *self);
 Expression packl_parser_parse_expr(PACKL_File *self);
 Node packl_parser_parse_statement(PACKL_File *self);
@@ -166,6 +167,8 @@ Mod_Call packl_parser_parse_module_call(PACKL_File *self) {
     return mod_call;
 }
 
+
+
 Parameter packl_parser_parse_param(PACKL_File *self) {
     Parameter param = {0};
 
@@ -177,9 +180,7 @@ Parameter packl_parser_parse_param(PACKL_File *self) {
 
     pexp(self, TOKEN_KIND_COLON, NULL);
 
-    // for the type
-    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
-    param.type = token.text;
+    param.type = packl_parser_parse_type(self);
 
     return param;
 }
@@ -244,10 +245,78 @@ Proc_Def packl_parser_parse_proc_def(PACKL_File *self) {
     return proc;
 }
 
+
+Array_Type packl_parser_parse_array_type(PACKL_File *self) {
+    Array_Type arr_type = {0};
+
+    pexp(self, TOKEN_KIND_ARRAY, NULL);
+    
+    pexp(self, TOKEN_KIND_OPEN_PARENT, NULL);
+
+    arr_type.type = malloc(sizeof(PACKL_Type));
+    *arr_type.type = packl_parser_parse_type(self);
+    
+    pexp(self, TOKEN_KIND_COMMA, NULL);
+    
+    arr_type.size = packl_parser_parse_expr(self);
+    
+    pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
+
+    return arr_type;
+}
+
+PACKL_Type packl_parser_parse_type(PACKL_File *self) {
+    PACKL_Type type = {0};
+
+    Token token = ppeek(self);
+
+    if(token.kind == TOKEN_KIND_ARRAY) {
+        type.kind = PACKL_TYPE_ARRAY; 
+        type.as.array = packl_parser_parse_array_type(self);
+        return type;
+    }
+
+    if (token.kind == TOKEN_KIND_INT_TYPE) {
+        padv(self);
+        type.kind = PACKL_TYPE_BASIC;
+        type.as.basic = PACKL_TYPE_INT;
+        return type;
+    } 
+
+    if(token.kind == TOKEN_KIND_STR_TYPE) {
+        padv(self);
+        type.kind = PACKL_TYPE_BASIC;
+        type.as.basic = PACKL_TYPE_STR;
+        return type;
+    }
+
+    PACKL_ERROR_LOC(self->filename, token.loc, "unknown type `" SV_FMT "`", SV_UNWRAP(token.text));
+}
+
+Expr_Arr packl_parser_parse_array_initialization(PACKL_File *self) {
+    Expr_Arr arr = {0};
+    DA_INIT(&arr, sizeof(Expression));
+
+    if (ppeek(self).kind == TOKEN_KIND_CLOSE_CURLY_BRACE) { return arr; }
+    
+    while (!peot(self)) {
+        Expression expr = packl_parser_parse_expr(self);
+        DA_APPEND(&arr, expr);
+
+        Token token = ppeek(self);
+
+        if (token.kind == TOKEN_KIND_COMMA) { padv(self); continue; }
+        else if (token.kind == TOKEN_KIND_CLOSE_CURLY_BRACE) { break; }
+        else { PACKL_ERROR_LOC(self->filename, token.loc, "unexpected token found `" SV_FMT "`", SV_UNWRAP(token.text)); }
+    }
+
+    return arr;
+}
+
 Var_Declaration packl_parser_parse_var_dec(PACKL_File *self) {
     Var_Declaration var_dec = {0};
-    
-    // consuming the `var` or `const` token
+
+    // consuming the `var` keyword    
     padv(self);
 
     Token token = {0};
@@ -256,12 +325,18 @@ Var_Declaration packl_parser_parse_var_dec(PACKL_File *self) {
 
     pexp(self, TOKEN_KIND_COLON, NULL);
     
-    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
-    var_dec.type = token.text;
+    var_dec.type = packl_parser_parse_type(self);
 
     pexp(self, TOKEN_KIND_EQUAL, NULL);
 
-    var_dec.value = packl_parser_parse_expr(self);
+    if(ppeek(self).kind == TOKEN_KIND_OPEN_CURLY_BRACE) {
+        padv(self);
+        var_dec.value.kind = EXPR_KIND_ARRAY;
+        var_dec.value.as.arr = packl_parser_parse_array_initialization(self);
+        pexp(self, TOKEN_KIND_CLOSE_CURLY_BRACE, NULL);
+    } else {
+        var_dec.value = packl_parser_parse_expr(self);
+    }
 
     return var_dec;
 }
@@ -293,6 +368,13 @@ Expression get_mod_call_expr(Mod_Call mod) {
     expr.kind = EXPR_KIND_MOD_CALL;
     expr.as.func = malloc(sizeof(Mod_Call));
     *expr.as.mod = mod;
+    return expr;
+}
+
+Expression get_arr_index_expr(Expr_Arr_Index arr_index) {
+    Expression expr = {0};
+    expr.kind = EXPR_KIND_ARRAY_INDEXING;
+    expr.as.arr_index = arr_index;
     return expr;
 }
 
@@ -344,6 +426,21 @@ int iscomparative(Token_Kind kind) {
     return false;
 }
 
+Expr_Arr_Index packl_parser_parse_array_indexing(PACKL_File *self) {
+    Expr_Arr_Index arr_index = {0};
+
+    Token token = {0};
+    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
+    arr_index.name = token.text;
+
+    pexp(self, TOKEN_KIND_OPEN_BRACKET, NULL);
+    arr_index.index = malloc(sizeof(Expression));
+    *arr_index.index = packl_parser_parse_expr(self);
+    pexp(self, TOKEN_KIND_CLOSE_BRACKET, NULL);
+
+    return arr_index;
+}
+
 Expression packl_parser_parse_primary_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected more tokens for the expression evaluation but end found"); }
 
@@ -351,7 +448,7 @@ Expression packl_parser_parse_primary_expr(PACKL_File *self) {
     
     if (token.kind == TOKEN_KIND_INTEGER_LIT) {
         padv(self);
-        return (Expression) { .kind = EXPR_KIND_INTEGER, .as.value = token.text };
+        return (Expression) { .kind = EXPR_KIND_INTEGER, .as.integer = integer_from_sv(token.text) };
     }
 
     if (token.kind == TOKEN_KIND_STRING_LIT) {
@@ -370,6 +467,11 @@ Expression packl_parser_parse_primary_expr(PACKL_File *self) {
         if (ppeek_(self, 1).kind == TOKEN_KIND_COLON) {
             Mod_Call mod = packl_parser_parse_module_call(self);
             return get_mod_call_expr(mod);
+        }
+
+        if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_BRACKET) {
+            Expr_Arr_Index arr_index = packl_parser_parse_array_indexing(self);
+            return get_arr_index_expr(arr_index);
         }
 
         padv(self);
@@ -611,8 +713,7 @@ Func_Def packl_parser_parse_func_def(PACKL_File *self) {
 
     // for the return type
     pexp(self, TOKEN_KIND_COLON, NULL);
-    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
-    func.return_type = token.text;
+    func.return_type = packl_parser_parse_type(self);
 
     pexp(self, TOKEN_KIND_OPEN_CURLY_BRACE, &token);
 
@@ -635,8 +736,7 @@ For_Statement packl_parser_parser_for(PACKL_File *self) {
 
     pexp(self, TOKEN_KIND_COLON, NULL);
     
-    pexp(self, TOKEN_KIND_IDENTIFIER, &token);
-    rof.iter_type = token.text;
+    rof.iter_type = packl_parser_parse_type(self);
 
     pexp(self, TOKEN_KIND_IN, NULL);
 

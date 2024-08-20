@@ -6,6 +6,7 @@
 #include "packl-context.h"
 #include "packl-lexer.h"
 #include "packl-parser.h"
+#include <stdlib.h>
 
 #define codegen packl_generate_file_code
 

@@ -30,6 +30,13 @@ typedef struct Lexer Lexer;
 // PARSING
 typedef struct Parser Parser;
 
+// types
+typedef enum Type Type;
+typedef struct Array_Type Array_Type;
+typedef enum PACKL_Type_Kind PACKL_Type_Kind;
+typedef union PACKL_Type_As PACKL_Type_As;
+typedef struct PACKL_Type PACKL_Type;
+
 // parameters
 typedef struct Parameter Parameter;
 typedef struct Parameters Parameters;
@@ -49,6 +56,8 @@ typedef struct Expr_Bin_Op Expr_Bin_Op;
 typedef union Expr_As Expr_As;
 typedef enum Expr_Kind Expr_Kind;
 typedef struct Expression Expression;
+typedef struct Expr_Arr Expr_Arr;
+typedef struct Expr_Arr_Index Expr_Arr_Index;
 
 // While Statement
 typedef struct While_Statement While_Statement;
@@ -112,6 +121,8 @@ enum Token_Kind {
     TOKEN_KIND_COLON,
     TOKEN_KIND_COMMA,
 
+    TOKEN_KIND_OPEN_BRACKET,
+    TOKEN_KIND_CLOSE_BRACKET,
     TOKEN_KIND_OPEN_PARENT, 
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
@@ -137,8 +148,11 @@ enum Token_Kind {
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
 
-    TOKEN_KIND_END,
+    TOKEN_KIND_ARRAY,
+    TOKEN_KIND_INT_TYPE,
+    TOKEN_KIND_STR_TYPE,
 
+    TOKEN_KIND_END,
 
     COUNT_TOKEN_KINDS,
 };
@@ -177,6 +191,18 @@ enum Node_Kind {
     NODE_KIND_MOD_CALL,
 };
 
+
+struct Expr_Arr {
+    Expression *items;
+    size_t count;
+    size_t size;
+};
+
+struct Expr_Arr_Index {
+    String_View name;
+    Expression *index;
+};
+
 enum Expr_Kind {
     EXPR_KIND_BIN_OP = 0,
     EXPR_KIND_INTEGER,
@@ -185,6 +211,8 @@ enum Expr_Kind {
     EXPR_KIND_FUNC_CALL,
     EXPR_KIND_NATIVE_CALL,
     EXPR_KIND_MOD_CALL,
+    EXPR_KIND_ARRAY,
+    EXPR_KIND_ARRAY_INDEXING,
     EXPR_KIND_NOT_INITIALIZED,
 };
 
@@ -206,13 +234,42 @@ struct Expr_Bin_Op {
 union Expr_As {
     Expr_Bin_Op bin;
     String_View value;
+    int64_t integer;
     Func_Call *func;
     Mod_Call *mod;
+    Expr_Arr arr;
+    Expr_Arr_Index arr_index;
 };
 
 struct Expression {
     Expr_Kind kind;
     Expr_As as;
+};  
+
+enum Type {
+    PACKL_TYPE_INT = 0,
+    PACKL_TYPE_STR,
+    COUNT_PACKL_TYPES,
+};
+
+struct Array_Type {
+    PACKL_Type *type;
+    Expression size;
+};
+
+enum PACKL_Type_Kind {
+    PACKL_TYPE_BASIC,
+    PACKL_TYPE_ARRAY,
+};
+
+union PACKL_Type_As {
+    Type basic;
+    Array_Type array;
+};
+
+struct PACKL_Type {
+    PACKL_Type_Kind kind;
+    PACKL_Type_As as;
 };  
 
 struct PACKL_Arg {
@@ -227,7 +284,7 @@ struct PACKL_Args {
 
 
 struct Parameter {
-    String_View type;
+    PACKL_Type type;
     String_View name;
 };  
 
@@ -241,7 +298,7 @@ struct Func_Def {
     String_View name;
     Parameters params;
     AST *body;
-    String_View return_type;
+    PACKL_Type return_type;
 };
 
 struct Var_Reassign {
@@ -262,19 +319,14 @@ struct If_Statement {
 
 struct For_Statement {
     String_View iter;
-    String_View iter_type;
+    PACKL_Type iter_type;
     PACKL_Args args;
     AST *body;
 };
 
-enum PACKL_Type {
-    PACKL_TYPE_STRING = 0,
-    PACKL_TYPE_INTEGER,
-};
-
 struct Var_Declaration {
     String_View name;
-    String_View type;
+    PACKL_Type type;
     Expression value;
 };
 
@@ -348,14 +400,14 @@ struct Procedure {
 };
 
 struct Variable {
-    String_View type;
+    PACKL_Type type;
     size_t stack_pos;  
 };
 
 struct Function {
     size_t label_value;
     Parameters params;
-    String_View return_type;
+    PACKL_Type return_type;
 };
 
 struct Module {
@@ -403,6 +455,8 @@ struct PACKL_External_Files {
 
 struct PACKL_File {
     char *filename;
+    char *path;
+
     Tokens tokens;
     AST ast;
 

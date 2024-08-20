@@ -26,6 +26,17 @@ void packl_destroy_ast(AST ast);
 
 void packl_destroy_func_call(Func_Call call);
 
+
+void packl_destroy_type(PACKL_Type type) {
+    if(type.kind == PACKL_TYPE_BASIC) { return; }
+    if(type.kind == PACKL_TYPE_ARRAY) {
+        packl_destroy_type(*type.as.array.type);
+        free(type.as.array.type);
+        return;
+    }
+    ASSERT(false, "unreachable");
+}
+
 void packl_destroy_expr(Expression expr) {
     if (expr.kind == EXPR_KIND_BIN_OP) {
         packl_destroy_expr(*expr.as.bin.lhs);
@@ -35,7 +46,15 @@ void packl_destroy_expr(Expression expr) {
     } else if (expr.kind == EXPR_KIND_FUNC_CALL) {
         packl_destroy_func_call(*expr.as.func);
         free(expr.as.func);
-    } 
+    } else if (expr.kind == EXPR_KIND_ARRAY) {
+        for(size_t i = 0; i < expr.as.arr.count; ++i) {
+            packl_destroy_expr(expr.as.arr.items[i]);
+        }
+        free(expr.as.arr.items);
+    }  else if (expr.kind == EXPR_KIND_ARRAY_INDEXING) {
+        packl_destroy_expr(*expr.as.arr_index.index);
+        free(expr.as.arr_index.index);
+    }
 }
 
 void packl_destroy_native_call(Func_Call call) {
@@ -58,6 +77,7 @@ void packl_destroy_proc_def(Proc_Def proc) {
 
 void packl_destroy_var_dec(Var_Declaration var) {
     packl_destroy_expr(var.value);
+    packl_destroy_type(var.type);
 }
 
 void packl_destroy_if(If_Statement fi) {
@@ -143,8 +163,11 @@ void packl_file_destroy(PACKL_File *self) {
     packl_destroy_ast(self->ast);    
     
     // pop the global context
-    packl_pop_context(self);
-    packl_remove_contexts(self);
+    if (self->contexts.count) { packl_pop_context(self); }
+
+    if (self->contexts.size) {
+        packl_remove_contexts(self);
+    }
     
     for(size_t i = 0; i < self->used_files.count; ++i) {
         packl_file_destroy(&self->used_files.items[i]);

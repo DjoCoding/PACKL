@@ -4,6 +4,8 @@ char *symbols[] = {
     ";",
     ":",
     ",",
+    "[",
+    "]",
     "(",
     ")",
     "{",
@@ -22,6 +24,8 @@ Token_Kind symbol_token_kinds[] = {
     TOKEN_KIND_SEMI_COLON,
     TOKEN_KIND_COLON,
     TOKEN_KIND_COMMA,
+    TOKEN_KIND_OPEN_BRACKET,
+    TOKEN_KIND_CLOSE_BRACKET,
     TOKEN_KIND_OPEN_PARENT,
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
@@ -48,6 +52,9 @@ char *keywords[] = {
     "in",
     "use",
     "as",
+    "array",
+    "int",
+    "str",
 };
 
 char *natives[] = {
@@ -68,6 +75,9 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_IN,
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
+    TOKEN_KIND_ARRAY,
+    TOKEN_KIND_INT_TYPE,
+    TOKEN_KIND_STR_TYPE,
 };
 
 char packl_lexer_peek(PACKL_File *self) {

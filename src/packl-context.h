@@ -14,8 +14,8 @@ void packl_pop_context(PACKL_File *self);
 void packl_remove_contexts(PACKL_File *self);
 
 
-Context_Item packl_init_var_context_item(String_View name, String_View type, size_t pos);
-Context_Item packl_init_func_context_item(String_View name, String_View return_type, Parameters params, size_t label_value);
+Context_Item packl_init_var_context_item(String_View name, PACKL_Type type, size_t pos);
+Context_Item packl_init_func_context_item(String_View name, PACKL_Type return_type, Parameters params, size_t label_value);
 Context_Item packl_init_proc_context_item(String_View name, Parameters params, size_t label_value);
 Context_Item packl_init_module_context_item(String_View name, char *filename);
 
