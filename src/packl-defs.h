@@ -244,6 +244,7 @@ union Expr_As {
 struct Expression {
     Expr_Kind kind;
     Expr_As as;
+    Location loc;
 };  
 
 enum Type {

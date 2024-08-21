@@ -4,10 +4,18 @@ func len(s: str): int {
     var notstop: int = 1;
 
     while(notstop) {
-        current = get_byte(s, i);
+        current = s[i];
         if (current) { i = i + 1; }
         else { notstop = 0; }
     }
     
     len = i;
+}
+
+func sum(s: str): int {
+    sum = 0;
+    var size: int = len(s);
+    for i: int in (0, size - 1) {
+        sum = sum + s[i];
+    }
 }

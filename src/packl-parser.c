@@ -351,6 +351,8 @@ Expression get_bin_operation(Expression lhs, Expression rhs, Operator op) {
     *expr.as.bin.lhs = lhs;
     *expr.as.bin.rhs = rhs;
     expr.as.bin.op = op;
+
+    expr.loc = lhs.loc;
     
     return expr;
 }
@@ -441,54 +443,71 @@ Expr_Arr_Index packl_parser_parse_array_indexing(PACKL_File *self) {
     return arr_index;
 }
 
+Expression packl_parser_init_expr(Location loc, Expr_Kind kind, Expr_As as) {
+    Expression expr = {0};
+    expr.loc = loc;
+    expr.as = as;
+    expr.kind = kind;
+    return expr;
+}
+
 Expression packl_parser_parse_primary_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected more tokens for the expression evaluation but end found"); }
 
     Token token = ppeek(self);
-    
+    Location loc = token.loc;
+    Expr_As as = {0};
+
     if (token.kind == TOKEN_KIND_INTEGER_LIT) {
         padv(self);
-        return (Expression) { .kind = EXPR_KIND_INTEGER, .as.integer = integer_from_sv(token.text) };
+        as.integer = integer_from_sv(token.text);
+        return packl_parser_init_expr(loc, EXPR_KIND_INTEGER, as);
     }
 
     if (token.kind == TOKEN_KIND_STRING_LIT) {
         padv(self);
-        return (Expression) { .kind = EXPR_KIND_STRING, .as.value = token.text };
+        as.value = token.text;
+        return packl_parser_init_expr(loc, EXPR_KIND_STRING, as);
     }
 
     if (token.kind == TOKEN_KIND_IDENTIFIER) {
         if (packl_get_tokens_number(self) < 2) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected a `;` but end of tokens found"); }
 
         if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT)  {
-            Func_Call func = packl_parser_parse_func_call(self);
-            return get_func_call_expr(func);
+            as.func = malloc(sizeof(Func_Call));
+            *as.func = packl_parser_parse_func_call(self);
+            return packl_parser_init_expr(loc, EXPR_KIND_FUNC_CALL, as);
         }
 
         if (ppeek_(self, 1).kind == TOKEN_KIND_COLON) {
-            Mod_Call mod = packl_parser_parse_module_call(self);
-            return get_mod_call_expr(mod);
+            as.mod = malloc(sizeof(Mod_Call));
+            *as.mod = packl_parser_parse_module_call(self);
+            return packl_parser_init_expr(loc, EXPR_KIND_MOD_CALL, as);
         }
 
         if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_BRACKET) {
-            Expr_Arr_Index arr_index = packl_parser_parse_array_indexing(self);
-            return get_arr_index_expr(arr_index);
+            as.arr_index = packl_parser_parse_array_indexing(self);
+            return packl_parser_init_expr(loc, EXPR_KIND_ARRAY_INDEXING, as);
         }
 
         padv(self);
-        return (Expression) { .kind = EXPR_KIND_ID, .as.value = token.text };
+        as.value = token.text;
+        return packl_parser_init_expr(loc, EXPR_KIND_ID, as);
     }
 
     if (token.kind == TOKEN_KIND_OPEN_PARENT) {
         padv(self);
         Expression expr = packl_parser_parse_comparative_expr(self);
+        expr.loc = loc;
         pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
         return expr;
     }
 
     if (token.kind == TOKEN_KIND_NATIVE) {
         if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT)  {
-            Func_Call native = packl_parser_parse_func_call(self);
-            return get_native_call_expr(native);
+            as.func = malloc(sizeof(Func_Call));
+            *as.func = packl_parser_parse_func_call(self);
+            return packl_parser_init_expr(loc, EXPR_KIND_NATIVE_CALL, as);
         }
 
         PACKL_ERROR_LOC(self->filename, token.loc, "expected `(` after the native `" SV_FMT "`", SV_UNWRAP(token.text));

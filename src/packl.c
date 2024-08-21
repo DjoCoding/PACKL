@@ -54,6 +54,10 @@ void packl_destroy_expr(Expression expr) {
     }  else if (expr.kind == EXPR_KIND_ARRAY_INDEXING) {
         packl_destroy_expr(*expr.as.arr_index.index);
         free(expr.as.arr_index.index);
+    } else if (expr.kind == EXPR_KIND_ARRAY) {
+        for(size_t i = 0; i < expr.as.arr.count; ++i) {
+            packl_destroy_expr(expr.as.arr.items[i]);
+        }
     }
 }
 
