@@ -1,38 +1,34 @@
 func len(s: str): int {
     var i: int = 0;
-    var current: int = 0;
-    var notstop: int = 1;
 
-    while(notstop) {
-        current = s[i];
-        if (current) { i = i + 1; }
-        else { notstop = 0; }
+    while(s[i]) {
+        i++;
     }
-    
+
     len = i;
 }
 
 func sum(s: str): int {
     sum = 0;
-    var size: int = len(s);
-    for i: int in (0, size - 1) {
-        sum = sum + s[i];
+    var i: int = 0;
+
+    while (s[i]) {
+        sum = sum + s[i++];
     }
 }
 
 func toupper(s: str): str {
-	var size: int = len(s);
-	var current: int = 0;
+    var i: int = 0;
+    var current: int = 0;
 
-	for i: int in (0, size - 1) {
-		current = s[i];
-		if (current > 96) {
-			if (current < 97 + 26 + 1) {
-			    current = current - 97 + 65;
-            }
-			s[i] = current;
-		}
-	}
+    while (s[i]) {
+        current = s[i];
+        if (current > 96) {
+            if (current < 97 + 26 + 1) { current = current - 97 + 65; }
+            s[i] = current;
+        }
+        i++;
+    }
 
 	toupper = s;
 }

@@ -2,6 +2,21 @@
 a very small programming language built on top of the PACKL Virtual Machine, it uses PASM for the code generation
 
 
+# Play with PACKL
+Once you have a PACKL program, follow the steps below to compile the program
+
+```console 
+    ./bin/packlc <filepath> -code -out <output>.pasm
+    ./bin/pasm <output>.pasm
+```
+
+to run the program type the command below
+
+```console 
+    ./bin/pvmr <output>.pvm
+```
+
+
 # PACKL Features
 ## Hello World 
 
@@ -135,3 +150,6 @@ proc main() {
     var l: int = a xor n       # l = 30
 }
 ```
+
+# Note
+the PACKL programming language is still not a stable language, don't expect much from it!
