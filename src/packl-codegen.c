@@ -12,7 +12,7 @@ void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node n
 void packl_generate_statements(PACKL_Compiler *c, PACKL_File *self, AST nodes, size_t indent);
 
 size_t number_of_popped_values[] = {
-    3,       // write  
+    2,       // write  
     1,       // read: 2 for reading and 1 for push
     0,       // alloc: 1 for the size and 1 for the push
     1,       // free
@@ -159,6 +159,12 @@ void packl_generate_syscall(PACKL_Compiler *c, int64_t value, size_t indent) {
     fprint_indent(c->f, indent);
     fprintf(c->f, "syscall %ld\n", value);
     c->stack_size -= number_of_popped_values[value];
+}
+
+void packl_generate_writei(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "writei\n");
+    c->stack_size -= 2;
 }
 
 void packl_generate_jmp(PACKL_Compiler *c, size_t value, size_t indent) {
@@ -782,11 +788,11 @@ void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node 
 
 void packl_check_caller_arity(PACKL_File *self, Node caller, size_t params_count) {
     if (caller.as.func_call.args.count < params_count) {
-        PACKL_ERROR_LOC(self->filename, caller.loc, "too few arguemnts for `" SV_FMT "` call, expected %zu got %zu", SV_UNWRAP(caller.as.func_call.name), params_count, caller.as.func_call.args.count);
+        PACKL_ERROR_LOC(self->filename, caller.loc, "too few arguments for `" SV_FMT "` call, expected %zu got %zu", SV_UNWRAP(caller.as.func_call.name), params_count, caller.as.func_call.args.count);
     }
 
     if (caller.as.func_call.args.count > params_count) {
-        PACKL_ERROR_LOC(self->filename, caller.loc, "too many arguemnts for `" SV_FMT "` call, expected %zu got %zu", SV_UNWRAP(caller.as.func_call.name), params_count, caller.as.func_call.args.count);
+        PACKL_ERROR_LOC(self->filename, caller.loc, "too many arguments for `" SV_FMT "` call, expected %zu got %zu", SV_UNWRAP(caller.as.func_call.name), params_count, caller.as.func_call.args.count);
     }
 
     // Add type checking for this 
@@ -896,11 +902,36 @@ void packl_generate_func_def_code(PACKL_Compiler *c, PACKL_File *self, Node func
 void packl_generate_native_write_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
     Func_Call native_write = caller.as.func_call;
 
-    packl_check_caller_arity(self, caller, 3);
+    if (caller.as.func_call.args.count < 2) {
+        PACKL_ERROR_LOC(self->filename, caller.loc, "too few arguments for `" SV_FMT "` call, expected at least %d got %zu", SV_UNWRAP(caller.as.func_call.name), 2, caller.as.func_call.args.count);
+    }
     
-    packl_push_arguments(c, self, native_write.args, indent);
+    Expression file_stream = native_write.args.items[0].expr;
+    if (file_stream.kind != EXPR_KIND_INTEGER) {
+        PACKL_ERROR_LOC(self->filename, file_stream.loc, "expected the file stream to be an integer");
+    }
 
-    packl_generate_syscall(c, 0, indent);
+    packl_generate_expr_code(c, self, file_stream, indent);
+    
+    for (size_t i = 1; i < native_write.args.count; ++i) {
+        PACKL_Arg arg = native_write.args.items[i];
+        
+        packl_generate_dup(c, indent);
+        
+        PACKL_Type type = packl_generate_expr_code(c,self, arg.expr, indent);
+        if (type.kind != PACKL_TYPE_BASIC) {
+            PACKL_ERROR_LOC(self->filename, arg.expr.loc, "expected a basic type to write");
+        }   
+
+        if (type.as.basic == PACKL_TYPE_INT) {
+            packl_generate_writei(c, indent);
+        } else {
+            packl_generate_syscall(c, 0, indent);   
+        }
+    }
+
+    // pop the file stream
+    packl_generate_pop(c, indent);
 }
 
 void packl_generate_native_exit_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
