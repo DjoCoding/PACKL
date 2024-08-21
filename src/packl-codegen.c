@@ -91,6 +91,12 @@ void packl_generate_div(PACKL_Compiler *c, size_t indent) {
     c->stack_size -= 1;
 }
 
+void packl_generate_mod(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "mod\n");
+    c->stack_size -= 1;
+}
+
 void packl_generate_cmpl(PACKL_Compiler *c, size_t indent) {
     fprint_indent(c->f, indent);
     fprintf(c->f, "cmpl\n");
@@ -103,9 +109,27 @@ void packl_generate_cmpg(PACKL_Compiler *c, size_t indent) {
     c->stack_size -= 1;
 }
 
-void packl_generate_mod(PACKL_Compiler *c, size_t indent) {
+void packl_generate_cmpge(PACKL_Compiler *c, size_t indent) {
     fprint_indent(c->f, indent);
-    fprintf(c->f, "mod\n");
+    fprintf(c->f, "cmpge\n");
+    c->stack_size -= 1;
+}
+
+void packl_generate_cmple(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "cmple\n");
+    c->stack_size -= 1;
+}
+
+void packl_generate_cmpe(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "cmpe\n");
+    c->stack_size -= 1;
+}
+
+void packl_generate_cmpne(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "cmpne\n");
     c->stack_size -= 1;
 }
 
@@ -233,6 +257,29 @@ void packl_generate_ssp(PACKL_Compiler *c, size_t indent) {
     c->stack_size -= 1;
 }
 
+void packl_generate_not(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "not\n");
+}
+
+void packl_generate_and(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "and\n");
+    c->stack_size -= 1;
+}
+
+void packl_generate_or(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "or\n");
+    c->stack_size -= 1;
+}
+
+void packl_generate_xor(PACKL_Compiler *c, size_t indent) {
+    fprint_indent(c->f, indent);
+    fprintf(c->f, "xor\n");
+    c->stack_size -= 1;
+}
+
 void packl_check_if_type_and_operator_fits_together(PACKL_File *self, PACKL_Type type, Operator op) {
     if(type.kind == PACKL_TYPE_ARRAY) {
         PACKL_ERROR(self->filename, "no arithmetic or logic operators used with arrays");
@@ -332,10 +379,24 @@ void packl_generate_operation_code(PACKL_Compiler *c, Operator op, size_t indent
             return packl_generate_div(c, indent);
         case OP_MOD:
             return packl_generate_mod(c, indent);
-        case OP_LESS:
+        case OP_L:
             return packl_generate_cmpl(c, indent);
-        case OP_GREATER:
+        case OP_G:
             return packl_generate_cmpg(c, indent);
+        case OP_GE:
+            return packl_generate_cmpge(c, indent);
+        case OP_LE:
+            return packl_generate_cmple(c, indent);
+        case OP_EQ:
+            return packl_generate_cmpe(c, indent);
+        case OP_NE:
+            return packl_generate_cmpne(c, indent);
+        case OP_AND:
+            return packl_generate_and(c, indent);
+        case OP_OR:
+            return packl_generate_or(c, indent);
+        case OP_XOR:
+            return packl_generate_xor(c, indent);
         default:
             ASSERT(false, "unreachable");
     }
@@ -439,6 +500,58 @@ PACKL_Type packl_generate_array_indexing_code(PACKL_Compiler *c, PACKL_File *sel
     return *var.type.as.array.type;
 }
 
+PACKL_Type packl_generate_not_unary_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression expr, size_t indent) {
+    PACKL_Type type = packl_generate_expr_code(c, self, expr, indent);
+    packl_generate_not(c, indent);
+    return type;
+}
+
+PACKL_Type packl_generate_postunary_expr_code(PACKL_Compiler *c, PACKL_File *self, Expr_Unary_Op unary_op, size_t indent) {
+    Expression operand = *unary_op.operand;
+
+    if (operand.kind != EXPR_KIND_ID) {
+        PACKL_ERROR_LOC(self->filename, operand.loc, "unsupported operation, expected an identifier");
+    }
+
+    Variable var = packl_find_variable(self, operand.as.value, operand.loc);
+
+
+    if (var.type.kind != PACKL_TYPE_BASIC) {
+        PACKL_ERROR_LOC(self->filename, operand.loc, "variable must be of an integer type");
+    }
+
+    if (var.type.as.basic != PACKL_TYPE_INT) {
+        PACKL_ERROR_LOC(self->filename, operand.loc, "variable must be of an integer type");
+    }
+
+    // duplicate the value of the variable
+    packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
+
+    packl_generate_dup(c, indent);
+
+    packl_generate_push(c, 1, indent);
+
+    if (unary_op.op == OP_INC) {
+        packl_generate_add(c, indent);
+    } else {
+        packl_generate_sub(c, indent);
+    }
+    
+    packl_generate_inswap(c, c->stack_size - var.stack_pos - 1, indent);
+    
+    packl_generate_pop(c, indent);
+
+    return var.type;
+}
+
+PACKL_Type packl_generate_preunary_expr_code(PACKL_Compiler *c, PACKL_File *self, Expr_Unary_Op unary_op, size_t indent) {
+    // for the pre unary operators, only not aka ! is supported
+    if(unary_op.op == OP_NOT) {
+        return packl_generate_not_unary_expr_code(c, self, *unary_op.operand, indent);
+    }
+    ASSERT(false, "unreachable");
+}
+
 PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression expr, size_t indent) {
     switch(expr.kind) {
         case EXPR_KIND_INTEGER:
@@ -457,6 +570,10 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
             return packl_generate_mod_call_expr_code(c, self, *expr.as.mod, indent);
         case EXPR_KIND_ARRAY_INDEXING:
             return packl_generate_array_indexing_code(c, self, expr.as.arr_index, indent);
+        case EXPR_KIND_PRE_UNARY_OP:
+            return packl_generate_preunary_expr_code(c, self, expr.as.unary, indent);
+        case EXPR_KIND_POST_UNARY_OP:
+            return packl_generate_postunary_expr_code(c, self, expr.as.unary, indent);
         default:
             ASSERT(false, "unreachable");
     }
@@ -649,13 +766,16 @@ void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node 
     }
 
 
-    PACKL_Type expr_type = packl_generate_expr_code(c, self, var_reassign.expr, indent);
-    PACKL_Type expected_type = var.type;
-    packl_expect_type(self, var_reassign.expr.loc, expected_type, expr_type);
+    if (var_reassign.expr.kind == EXPR_KIND_POST_UNARY_OP) {
+        packl_generate_postunary_expr_code(c, self, var_reassign.expr.as.unary, indent);
+    } else {
+        PACKL_Type expr_type = packl_generate_expr_code(c, self, var_reassign.expr, indent);
+        PACKL_Type expected_type = var.type;
+        packl_expect_type(self, var_reassign.expr.loc, expected_type, expr_type);
 
-    size_t var_pos = c->stack_size - var.stack_pos - 1;
-
-    packl_generate_inswap(c, var_pos, indent);
+        size_t var_pos = c->stack_size - var.stack_pos - 1;
+        packl_generate_inswap(c, var_pos, indent);
+    }
 
     packl_generate_pop(c, indent);
 }

@@ -52,6 +52,7 @@ typedef struct Use Use;
 
 // expression
 typedef enum Operator Operator;
+typedef struct Expr_Unary_Op Expr_Unary_Op;
 typedef struct Expr_Bin_Op Expr_Bin_Op;
 typedef union Expr_As Expr_As;
 typedef enum Expr_Kind Expr_Kind;
@@ -127,15 +128,25 @@ enum Token_Kind {
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
     TOKEN_KIND_CLOSE_CURLY_BRACE,
+    
     TOKEN_KIND_EQUAL,
+
     TOKEN_KIND_PLUS,
+    TOKEN_KIND_DOUBLE_PLUS,
     TOKEN_KIND_MINUS,
+    TOKEN_KIND_DOUBLE_MINUS,
     TOKEN_KIND_STAR,
     TOKEN_KIND_SLASH,
     TOKEN_KIND_MOD,
+
+    TOKEN_KIND_DOUBLE_EQUAL,
     TOKEN_KIND_LESS,
     TOKEN_KIND_GREATER,
-    
+    TOKEN_KIND_LESS_OR_EQUAL,
+    TOKEN_KIND_GREATER_OR_EQUAL,
+    TOKEN_KIND_NOT,
+    TOKEN_KIND_NOT_EQUAL,
+
     TOKEN_KIND_PROC,
     TOKEN_KIND_FUNC,
     TOKEN_KIND_RETURN,
@@ -147,6 +158,10 @@ enum Token_Kind {
     TOKEN_KIND_IN,
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
+
+    TOKEN_KIND_OR,
+    TOKEN_KIND_AND,
+    TOKEN_KIND_XOR,
 
     TOKEN_KIND_ARRAY,
     TOKEN_KIND_INT_TYPE,
@@ -205,6 +220,8 @@ struct Expr_Arr_Index {
 
 enum Expr_Kind {
     EXPR_KIND_BIN_OP = 0,
+    EXPR_KIND_PRE_UNARY_OP,
+    EXPR_KIND_POST_UNARY_OP,
     EXPR_KIND_INTEGER,
     EXPR_KIND_STRING,
     EXPR_KIND_ID,
@@ -222,8 +239,18 @@ enum Operator {
     OP_MUL,
     OP_DIV,
     OP_MOD,
-    OP_LESS,
-    OP_GREATER,
+    OP_L,
+    OP_G,
+    OP_LE,
+    OP_GE,
+    OP_EQ,
+    OP_INC,
+    OP_DEC,
+    OP_AND,
+    OP_XOR,
+    OP_OR,
+    OP_NOT,
+    OP_NE,
 };  
 
 struct Expr_Bin_Op {
@@ -231,8 +258,15 @@ struct Expr_Bin_Op {
     Operator op;
 };
 
+struct Expr_Unary_Op {
+    Expression *operand;
+    Operator op;
+};
+
+
 union Expr_As {
     Expr_Bin_Op bin;
+    Expr_Unary_Op unary;
     String_View value;
     int64_t integer;
     Func_Call *func;

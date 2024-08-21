@@ -1,0 +1,46 @@
+# function definition
+func f(a: int, b: str): int {
+    f = a + b;
+}
+
+# variable declaration 
+var v: int = 10;
+var s: str = "packl";
+var a: array(int, 3) = {1, 2, 3};
+
+# variable re-assignement
+v = 20;
+s = "PACKL";
+# a = {2, 3, 1};
+a[0] = 1;
+s[1] = "D";
+
+# if condition 
+if (((a == b) and (v <= 20)) or (x == 20)) {
+} else if (a < b) {
+} else { 
+}
+
+# while loop 
+while (a >= b) {
+}
+
+# for loop 
+for i: int in (1, 10) {
+    i = i + 1;
+}
+
+# use files
+use "file.packl" as file
+
+# procedure defintion 
+proc p() {
+    println("Hello World"); 
+}
+
+proc main() {
+    if (!(a == b)) {
+        a++;
+        a = ++b;
+    }
+}

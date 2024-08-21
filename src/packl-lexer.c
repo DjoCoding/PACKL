@@ -10,14 +10,7 @@ char *symbols[] = {
     ")",
     "{",
     "}",
-    "=",
-    "+",
-    "-",
-    "*",
-    "/",
-    "%",
-    "<",
-    ">",
+
 };
 
 Token_Kind symbol_token_kinds[] = {
@@ -30,28 +23,31 @@ Token_Kind symbol_token_kinds[] = {
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
     TOKEN_KIND_CLOSE_CURLY_BRACE,
-    TOKEN_KIND_EQUAL,
-    TOKEN_KIND_PLUS,
-    TOKEN_KIND_MINUS,
-    TOKEN_KIND_STAR,
-    TOKEN_KIND_SLASH,
-    TOKEN_KIND_MOD,
-    TOKEN_KIND_LESS,
-    TOKEN_KIND_GREATER,
 };
 
 char *keywords[] = {
     "proc",
+    
     "func",
     "return",
+    
     "var",
+    
     "if",
     "else",
+    
     "while",
+    
     "for",
     "in",
+    
     "use",
     "as",
+    
+    "or",
+    "and",
+    "xor",
+    
     "array",
     "int",
     "str",
@@ -60,21 +56,31 @@ char *keywords[] = {
 char *natives[] = {
     "write",
     "exit",
-    "get_byte",
 };
 
 Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_PROC,
+    
     TOKEN_KIND_FUNC,
     TOKEN_KIND_RETURN,
+    
     TOKEN_KIND_VAR,
+    
     TOKEN_KIND_IF,
     TOKEN_KIND_ELSE,
+    
     TOKEN_KIND_WHILE,
+    
     TOKEN_KIND_FOR,
     TOKEN_KIND_IN,
+
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
+    
+    TOKEN_KIND_OR,
+    TOKEN_KIND_AND,
+    TOKEN_KIND_XOR,
+    
     TOKEN_KIND_ARRAY,
     TOKEN_KIND_INT_TYPE,
     TOKEN_KIND_STR_TYPE,
@@ -187,16 +193,106 @@ Token packl_lexer_read_token(PACKL_File *self) {
     token.loc = self->lexer.loc;
 
     char *current = &self->lexer.source.content[self->lexer.current];
-
-    String_View current_view = SV_GET(current, 1);
+    
+    token.text = SV_GET(current, 1);
 
     for (size_t i = 0; i < ARR_SIZE(symbols); ++i) {
-        if (sv_eq(SV(symbols[i]), current_view)) {
+        if (sv_eq(SV(symbols[i]), token.text)) {
             ladv(self);
             token.kind = symbol_token_kinds[i];
-            token.text = current_view;
             return token;
         }
+    }
+
+    if (*current == '=') {
+        ladv(self);
+        if (lpeek(self) == '=') {
+            token.text.count++;
+            token.kind = TOKEN_KIND_DOUBLE_EQUAL;
+            ladv(self);
+            return token;
+        }
+        token.kind = TOKEN_KIND_EQUAL;
+        return token;
+    }
+
+    if (*current == '<') {
+        ladv(self);
+        if (lpeek(self) == '=') {
+            token.text.count++;
+            ladv(self);
+            token.kind = TOKEN_KIND_LESS_OR_EQUAL;
+            return token;
+        }
+        token.kind = TOKEN_KIND_LESS;
+        return token;
+    }
+
+    if(*current == '>') {
+        ladv(self);
+        if (lpeek(self) == '=') {
+            token.text.count++;
+            ladv(self);
+            token.kind = TOKEN_KIND_GREATER_OR_EQUAL;
+            return token;
+        }
+        token.kind = TOKEN_KIND_GREATER;
+        return token;    
+    }
+
+    if (*current == '+') {
+        ladv(self);
+        if (lpeek(self) == '+') {
+            token.text.count++;
+            ladv(self);
+            token.kind = TOKEN_KIND_DOUBLE_PLUS;
+            return token;
+        }
+        token.kind = TOKEN_KIND_PLUS;
+        return token;
+    }
+
+
+    if (*current == '-') {
+        ladv(self);
+        if (lpeek(self) == '-') {
+            token.text.count++;
+            ladv(self);
+            token.kind = TOKEN_KIND_DOUBLE_MINUS;
+            return token;
+        }
+        token.kind = TOKEN_KIND_MINUS;
+        return token;
+    }
+
+    if (*current == '*') {
+        ladv(self);
+        token.kind = TOKEN_KIND_STAR;
+        return token;
+    }
+
+    if (*current == '/') {
+        ladv(self);
+        token.kind = TOKEN_KIND_SLASH;
+        return token;
+    }
+
+    if (*current == '%') {
+        ladv(self);
+        token.kind = TOKEN_KIND_MOD;
+        return token;
+    }
+
+    if (*current == '!') {
+        ladv(self);
+        if (lpeek(self) == '=') {
+            token.text.count++;
+            ladv(self);
+            token.kind = TOKEN_KIND_NOT_EQUAL;
+            return token;
+        } 
+        token.kind = TOKEN_KIND_NOT;
+        return token;
     }
 
     if (*current == '"') { return packl_lexer_lex_string(self); }
@@ -212,9 +308,17 @@ Token packl_lexer_read_token(PACKL_File *self) {
     PACKL_ERROR_LOC(self->filename, token.loc, "failed to identify the char `%c`", *current);
 }
 
+void packl_lexer_skip_comment(PACKL_File *self) {
+    while (!leof(self)) {
+        if (lpeek(self) == '\n') { break; }
+        ladv(self);
+    }
+}
+
 void packl_lexer_lex(PACKL_File *self) {
     DA_INIT(&self->tokens, sizeof(Token));
     while (!leof(self)) {
+        if (lpeek(self) == '#') { packl_lexer_skip_comment(self); continue; }
         if (isspace(lpeek(self))) { ladv(self); continue; }
         Token token = lread(self);
         DA_APPEND(&self->tokens, token);

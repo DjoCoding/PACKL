@@ -45,26 +45,36 @@ void packl_destroy_type(PACKL_Type type) {
 }
 
 void packl_destroy_expr(Expression expr) {
-    if (expr.kind == EXPR_KIND_BIN_OP) {
-        packl_destroy_expr(*expr.as.bin.lhs);
-        packl_destroy_expr(*expr.as.bin.rhs);
-        free(expr.as.bin.lhs);
-        free(expr.as.bin.rhs);
-    } else if (expr.kind == EXPR_KIND_FUNC_CALL) {
-        packl_destroy_func_call(*expr.as.func);
-        free(expr.as.func);
-    } else if (expr.kind == EXPR_KIND_ARRAY) {
-        for(size_t i = 0; i < expr.as.arr.count; ++i) {
-            packl_destroy_expr(expr.as.arr.items[i]);
-        }
-        free(expr.as.arr.items);
-    }  else if (expr.kind == EXPR_KIND_ARRAY_INDEXING) {
-        packl_destroy_expr(*expr.as.arr_index.index);
-        free(expr.as.arr_index.index);
-    } else if (expr.kind == EXPR_KIND_ARRAY) {
-        for(size_t i = 0; i < expr.as.arr.count; ++i) {
-            packl_destroy_expr(expr.as.arr.items[i]);
-        }
+    switch(expr.kind) {
+        case EXPR_KIND_BIN_OP:
+            packl_destroy_expr(*expr.as.bin.lhs);
+            packl_destroy_expr(*expr.as.bin.rhs);
+            free(expr.as.bin.lhs);
+            free(expr.as.bin.rhs);
+            break;
+        case EXPR_KIND_FUNC_CALL:
+            packl_destroy_func_call(*expr.as.func);
+            free(expr.as.func);    
+            break;  
+        case EXPR_KIND_ARRAY:
+            for(size_t i = 0; i < expr.as.arr.count; ++i) {
+                packl_destroy_expr(expr.as.arr.items[i]);
+            }
+            free(expr.as.arr.items); 
+            break;
+        case EXPR_KIND_ARRAY_INDEXING:
+            packl_destroy_expr(*expr.as.arr_index.index);
+            free(expr.as.arr_index.index);
+            break;
+        case EXPR_KIND_PRE_UNARY_OP:
+        case EXPR_KIND_POST_UNARY_OP:
+            if (expr.as.unary.operand) {
+                packl_destroy_expr(*expr.as.unary.operand);
+                free(expr.as.unary.operand);
+            }
+            break;
+        default:
+            break;
     }
 }
 

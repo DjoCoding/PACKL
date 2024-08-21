@@ -23,6 +23,8 @@ char *token_kinds_str[] = {
     "%",
     "<",
     ">",
+    "!",
+    "!=",
 
     "proc",
     "var",
@@ -72,9 +74,29 @@ Operator packl_get_operator(PACKL_File *self, Token token) {
         case TOKEN_KIND_MOD:
             return OP_MOD;
         case TOKEN_KIND_LESS:
-            return OP_LESS;
+            return OP_L;
         case TOKEN_KIND_GREATER:
-            return OP_GREATER;
+            return OP_G;
+        case TOKEN_KIND_LESS_OR_EQUAL:
+            return OP_LE;
+        case TOKEN_KIND_GREATER_OR_EQUAL:
+            return OP_GE;
+        case TOKEN_KIND_DOUBLE_EQUAL:
+            return OP_EQ;
+        case TOKEN_KIND_AND:
+            return OP_AND;
+        case TOKEN_KIND_OR:
+            return OP_OR;
+        case TOKEN_KIND_XOR:
+            return OP_XOR;
+        case TOKEN_KIND_NOT_EQUAL:
+            return OP_NE;
+        case TOKEN_KIND_DOUBLE_PLUS:
+            return OP_INC;
+        case TOKEN_KIND_DOUBLE_MINUS:
+            return OP_DEC;
+        case TOKEN_KIND_NOT:
+            return OP_NOT;
         default:
             PACKL_ERROR_LOC(self->filename, token.loc, "expected operator type but `" SV_FMT "` found", SV_UNWRAP(ppeek(self).text));
     }
@@ -419,9 +441,52 @@ int iscomparative(Token_Kind kind) {
     Token_Kind kinds[] = {
         TOKEN_KIND_LESS,
         TOKEN_KIND_GREATER,
+        TOKEN_KIND_DOUBLE_EQUAL,
+        TOKEN_KIND_LESS_OR_EQUAL,
+        TOKEN_KIND_GREATER_OR_EQUAL,
+        TOKEN_KIND_NOT_EQUAL,
     };
 
     for (size_t i = 0; i < ARR_SIZE(kinds); ++i) {
+        if (kinds[i] == kind) { return true; }
+    }
+
+    return false;
+}
+
+int islogical(Token_Kind kind) {
+    Token_Kind kinds[] = {
+        TOKEN_KIND_AND,
+        TOKEN_KIND_OR,
+        TOKEN_KIND_XOR,
+    };
+
+    for (size_t i = 0; i < ARR_SIZE(kinds); ++i) {
+        if (kinds[i] == kind) { return true; }
+    }
+
+    return false;
+}
+
+int ispreunary(Token_Kind kind) {
+    Token_Kind kinds[] = {
+        TOKEN_KIND_NOT,
+    };
+
+    for(size_t i = 0; i < ARR_SIZE(kinds); ++i) {
+        if (kinds[i] == kind) { return true; }
+    }
+
+    return false;
+}
+
+int ispostunary(Token_Kind kind) {
+    Token_Kind kinds[] = {
+        TOKEN_KIND_DOUBLE_PLUS,
+        TOKEN_KIND_DOUBLE_MINUS,    
+    };
+
+    for(size_t i = 0; i < ARR_SIZE(kinds); ++i) {
         if (kinds[i] == kind) { return true; }
     }
 
@@ -443,11 +508,17 @@ Expr_Arr_Index packl_parser_parse_array_indexing(PACKL_File *self) {
     return arr_index;
 }
 
-Expression packl_parser_init_expr(Location loc, Expr_Kind kind, Expr_As as) {
+Expression packl_parser_parse_primary_expr(PACKL_File *self);
+
+Expression packl_parser_preunary_expression(PACKL_File *self) {
     Expression expr = {0};
-    expr.loc = loc;
-    expr.as = as;
-    expr.kind = kind;
+    expr.kind = EXPR_KIND_PRE_UNARY_OP;
+    expr.as.unary.op = packl_get_operator(self, ppeek(self));
+    
+    padv(self);
+    
+    expr.as.unary.operand = malloc(sizeof(Expression));
+    *expr.as.unary.operand = packl_parser_parse_primary_expr(self);
     return expr;
 }
 
@@ -455,59 +526,82 @@ Expression packl_parser_parse_primary_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected more tokens for the expression evaluation but end found"); }
 
     Token token = ppeek(self);
-    Location loc = token.loc;
-    Expr_As as = {0};
+    Expression expr = {0};
+    expr.loc = token.loc;
+
+    if (ispreunary(token.kind)) {
+        return packl_parser_preunary_expression(self);
+    }
 
     if (token.kind == TOKEN_KIND_INTEGER_LIT) {
         padv(self);
-        as.integer = integer_from_sv(token.text);
-        return packl_parser_init_expr(loc, EXPR_KIND_INTEGER, as);
+        expr.kind = EXPR_KIND_INTEGER;
+        expr.as.integer = integer_from_sv(token.text);
+        return expr;
     }
 
     if (token.kind == TOKEN_KIND_STRING_LIT) {
         padv(self);
-        as.value = token.text;
-        return packl_parser_init_expr(loc, EXPR_KIND_STRING, as);
+        expr.kind = EXPR_KIND_STRING;
+        expr.as.value = token.text;
+        return expr;
     }
 
     if (token.kind == TOKEN_KIND_IDENTIFIER) {
         if (packl_get_tokens_number(self) < 2) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected a `;` but end of tokens found"); }
 
-        if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT)  {
-            as.func = malloc(sizeof(Func_Call));
-            *as.func = packl_parser_parse_func_call(self);
-            return packl_parser_init_expr(loc, EXPR_KIND_FUNC_CALL, as);
+        Expression expr = {0};
+
+        switch(ppeek_(self, 1).kind) {
+            case TOKEN_KIND_OPEN_PARENT:
+                expr.kind = EXPR_KIND_FUNC_CALL;
+                expr.as.func = malloc(sizeof(Func_Call));
+                *expr.as.func = packl_parser_parse_func_call(self);
+                break;
+            case TOKEN_KIND_COLON:
+                expr.kind = EXPR_KIND_MOD_CALL;
+                expr.as.func = malloc(sizeof(Func_Call));
+                *expr.as.func = packl_parser_parse_func_call(self);
+                break;
+            case TOKEN_KIND_OPEN_BRACKET:
+                expr.kind = EXPR_KIND_ARRAY_INDEXING;
+                expr.as.arr_index = packl_parser_parse_array_indexing(self);
+                break;
+            default:    
+                expr.kind = EXPR_KIND_ID;
+                expr.as.value = token.text;
+                padv(self);
+        } 
+
+        if (ispostunary(ppeek(self).kind)) {
+            Expression unary_expr = {0};
+            unary_expr.loc = expr.loc;
+            unary_expr.kind = EXPR_KIND_POST_UNARY_OP;
+            unary_expr.as.unary.op = packl_get_operator(self, ppeek(self));  
+            
+            padv(self);
+
+            unary_expr.as.unary.operand = malloc(sizeof(Expression));
+            *unary_expr.as.unary.operand = expr;
+            expr = unary_expr;
         }
 
-        if (ppeek_(self, 1).kind == TOKEN_KIND_COLON) {
-            as.mod = malloc(sizeof(Mod_Call));
-            *as.mod = packl_parser_parse_module_call(self);
-            return packl_parser_init_expr(loc, EXPR_KIND_MOD_CALL, as);
-        }
-
-        if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_BRACKET) {
-            as.arr_index = packl_parser_parse_array_indexing(self);
-            return packl_parser_init_expr(loc, EXPR_KIND_ARRAY_INDEXING, as);
-        }
-
-        padv(self);
-        as.value = token.text;
-        return packl_parser_init_expr(loc, EXPR_KIND_ID, as);
+        return expr;
     }
 
     if (token.kind == TOKEN_KIND_OPEN_PARENT) {
         padv(self);
         Expression expr = packl_parser_parse_comparative_expr(self);
-        expr.loc = loc;
         pexp(self, TOKEN_KIND_CLOSE_PARENT, NULL);
         return expr;
     }
 
     if (token.kind == TOKEN_KIND_NATIVE) {
         if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT)  {
-            as.func = malloc(sizeof(Func_Call));
-            *as.func = packl_parser_parse_func_call(self);
-            return packl_parser_init_expr(loc, EXPR_KIND_NATIVE_CALL, as);
+            expr.kind = EXPR_KIND_NATIVE_CALL;
+            expr.as.func = malloc(sizeof(Func_Call));
+            *expr.as.func = packl_parser_parse_func_call(self);
+            return expr;
         }
 
         PACKL_ERROR_LOC(self->filename, token.loc, "expected `(` after the native `" SV_FMT "`", SV_UNWRAP(token.text));
@@ -576,9 +670,29 @@ Expression packl_parser_parse_comparative_expr(PACKL_File *self) {
     return lhs;
 }
 
+Expression packl_parser_parse_logical_expr(PACKL_File *self) {
+    Expression lhs = packl_parser_parse_comparative_expr(self);
+
+    while (!peot(self)) {
+        Token token = ppeek(self);
+        if (!islogical(token.kind)) { break; }
+
+        Operator op = packl_get_operator(self, token);
+        padv(self);
+
+        Expression rhs = packl_parser_parse_comparative_expr(self);
+
+        Expression bin = get_bin_operation(lhs, rhs, op);
+
+        lhs = bin;
+    }
+
+    return lhs;
+}
+
 Expression packl_parser_parse_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected an expresssion but end found"); }
-    return packl_parser_parse_comparative_expr(self);
+    return packl_parser_parse_logical_expr(self);
 }
 
 Var_Reassign packl_parser_parse_var_reassign(PACKL_File *self) {
@@ -597,10 +711,27 @@ Var_Reassign packl_parser_parse_var_reassign(PACKL_File *self) {
         var.kind = PACKL_TYPE_BASIC;
     }
 
-    pexp(self, TOKEN_KIND_EQUAL, NULL);
-
-    var.expr = packl_parser_parse_expr(self);
-
+    if (ppeek(self).kind == TOKEN_KIND_DOUBLE_PLUS) {
+        var.expr.kind = EXPR_KIND_POST_UNARY_OP;
+        var.expr.as.unary.op = OP_INC;
+        var.expr.as.unary.operand = malloc(sizeof(Expression));
+        var.expr.as.unary.operand->kind = EXPR_KIND_ID;
+        var.expr.as.unary.operand->as.value = var.name;
+        var.expr.loc = ppeek(self).loc;    
+        padv(self);
+    } else if (ppeek(self).kind == TOKEN_KIND_DOUBLE_MINUS) {
+        var.expr.kind = EXPR_KIND_POST_UNARY_OP;
+        var.expr.as.unary.op = OP_DEC;
+        var.expr.as.unary.operand = malloc(sizeof(Expression));
+        var.expr.as.unary.operand->kind = EXPR_KIND_ID;
+        var.expr.as.unary.operand->as.value = var.name;
+        var.expr.loc = ppeek(self).loc;    
+        padv(self);
+    } else { 
+        pexp(self, TOKEN_KIND_EQUAL, NULL);
+        var.expr = packl_parser_parse_expr(self);
+    }
+    
     return var;
 }
 
@@ -631,6 +762,18 @@ Node packl_parser_parse_identifier(PACKL_File *self) {
     }
 
     if (ppeek_(self, 1).kind == TOKEN_KIND_EQUAL) {
+        node.kind = NODE_KIND_VAR_REASSIGN;
+        node.as.var = packl_parser_parse_var_reassign(self);
+        return node;
+    }
+
+    if (ppeek_(self, 1).kind == TOKEN_KIND_DOUBLE_PLUS) {
+        node.kind = NODE_KIND_VAR_REASSIGN;
+        node.as.var = packl_parser_parse_var_reassign(self);
+        return node;
+    }
+
+    if (ppeek_(self, 1).kind == TOKEN_KIND_DOUBLE_MINUS) {
         node.kind = NODE_KIND_VAR_REASSIGN;
         node.as.var = packl_parser_parse_var_reassign(self);
         return node;

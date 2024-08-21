@@ -17,26 +17,47 @@ char *token_kinds[] = {
     ")",
     "{",
     "}",
+
     "=",
+
     "+",
+    "++",
     "-",
+    "--",
     "*",
     "/",
     "%",
+    
+    "==",
     "<",
     ">",
+    "<=",
+    ">=",
+    "!",
+    "!=",
 
     "proc",
+    
     "func",
     "return",
+    
     "var",
+    
     "if",
     "else",
+    
     "while",
+    
     "for",
     "in",
+
     "use",
     "as",
+    
+    "or",
+    "and",
+    "xor",
+    
     "array",
     "type-int",
     "type-str",
@@ -53,7 +74,7 @@ void print_indent(size_t indent) {
     for (size_t i = 0; i < indent; ++i) { printf("  "); }
 }
 
-void packl_print_operator(Operator op, size_t indent) {
+void packl_print_operator(Operator op, size_t indent) {    
     switch(op) {
         case OP_PLUS:
             printf("+\n");
@@ -70,11 +91,41 @@ void packl_print_operator(Operator op, size_t indent) {
         case OP_MOD: 
             printf("mod\n");
             break;
-        case OP_LESS:
+        case OP_L:
             printf("<\n");
             break;
-        case OP_GREATER:
+        case OP_G:
             printf(">\n");
+            break;
+        case OP_LE:
+            printf("<=\n");
+            break;
+        case OP_GE:
+            printf(">=\n");
+            break;
+        case OP_EQ:
+            printf("==\n");
+            break;
+        case OP_AND:
+            printf("and\n");
+            break;
+        case OP_OR:
+            printf("or\n");
+            break;
+        case OP_XOR:
+            printf("xor\n");
+            break;
+        case OP_NOT:
+            printf("!\n");
+            break;
+        case OP_NE:
+            printf("!=");
+            break;
+        case OP_INC:
+            printf("++\n");
+            break;
+        case OP_DEC:
+            printf("--\n");
             break;
         default:
             ASSERT(false, "unreachable"); 
@@ -158,32 +209,79 @@ void packl_print_expr_arr_index(Expr_Arr_Index arr_index, size_t indent) {
     packl_print_expr(*arr_index.index, indent + 1);
 }
 
+void packl_print_string_expr(String_View value, size_t indent) {
+    print_indent(indent);
+    printf("string: \"" SV_FMT "\"\n", SV_UNWRAP(value));
+}
+
+void packl_print_integer_expr(int64_t value, size_t indent) {
+    print_indent(indent);
+    printf("integer: %ld\n", value);
+}
+
+void packl_print_id_expr(String_View value, size_t indent) {
+    print_indent(indent);
+    printf("identifier: `" SV_FMT "`\n", SV_UNWRAP(value));
+}
+
+void packl_print_binop_expr(Expression expr, size_t indent) {
+    print_indent(indent);
+    packl_print_operator(expr.as.bin.op, indent + 1);
+    packl_print_expr(*expr.as.bin.lhs, indent + 2);
+    packl_print_expr(*expr.as.bin.rhs, indent + 2);
+}
+
+void packl_print_preunary_expr(Expr_Unary_Op unary, size_t indent) {
+    print_indent(indent);
+    printf("pre-unary:\n");
+
+    print_indent(indent + 1);
+    packl_print_operator(unary.op, indent + 1);
+
+    if (unary.operand) {
+        packl_print_expr(*unary.operand, indent + 2);
+    }
+}
+
+void packl_print_postunary_expr(Expr_Unary_Op unary, size_t indent) {
+    print_indent(indent);
+    printf("post-unary:\n");
+
+    print_indent(indent + 1);
+    packl_print_operator(unary.op, indent + 1);
+
+    if (unary.operand) {
+        packl_print_expr(*unary.operand, indent + 2);
+    }
+}
+
 void packl_print_expr(Expression expr, size_t indent) {
-    if (expr.kind == EXPR_KIND_STRING) {
-        print_indent(indent);
-        printf("string: \"" SV_FMT "\"\n", SV_UNWRAP(expr.as.value));
-    } else if (expr.kind == EXPR_KIND_INTEGER) {
-        print_indent(indent);
-        printf("integer: %ld\n", expr.as.integer);
-    } else if (expr.kind == EXPR_KIND_ID) {
-        print_indent(indent);
-        printf("identifier: `" SV_FMT "`\n", SV_UNWRAP(expr.as.value));
-    } else if (expr.kind == EXPR_KIND_FUNC_CALL) {
-        packl_print_func_call(*expr.as.func, indent);
-    } else if (expr.kind == EXPR_KIND_BIN_OP) {
-        print_indent(indent);
-        packl_print_operator(expr.as.bin.op, indent + 1);
-        packl_print_expr(*expr.as.bin.lhs, indent + 2);
-        packl_print_expr(*expr.as.bin.rhs, indent + 2);
-    } else if (expr.kind == EXPR_KIND_NATIVE_CALL) {
-        packl_print_func_call(*expr.as.func, indent);
-    } else if (expr.kind == EXPR_KIND_MOD_CALL) {
-        packl_print_mod_call(*expr.as.mod, indent);
-    } else if (expr.kind == EXPR_KIND_ARRAY) {
-        packl_print_expr_arr(expr.as.arr, indent);
-    } else if (expr.kind == EXPR_KIND_ARRAY_INDEXING) {
-        packl_print_expr_arr_index(expr.as.arr_index, indent);
-    } else { ASSERT(false, "unreachable"); }
+    switch(expr.kind) {
+        case EXPR_KIND_STRING:
+            return packl_print_string_expr(expr.as.value, indent);
+        case EXPR_KIND_INTEGER:
+            return packl_print_integer_expr(expr.as.integer, indent);
+        case EXPR_KIND_ID:
+            return packl_print_id_expr(expr.as.value, indent);
+        case EXPR_KIND_FUNC_CALL:
+            return packl_print_func_call(*expr.as.func, indent);
+        case EXPR_KIND_BIN_OP:
+            return packl_print_binop_expr(expr, indent);
+        case EXPR_KIND_NATIVE_CALL:
+            return packl_print_func_call(*expr.as.func, indent);
+        case EXPR_KIND_MOD_CALL:
+            return packl_print_mod_call(*expr.as.mod, indent);
+        case EXPR_KIND_ARRAY:
+            return packl_print_expr_arr(expr.as.arr, indent);
+        case EXPR_KIND_ARRAY_INDEXING:
+            return packl_print_expr_arr_index(expr.as.arr_index, indent);
+        case EXPR_KIND_PRE_UNARY_OP:
+            return packl_print_preunary_expr(expr.as.unary, indent);
+        case EXPR_KIND_POST_UNARY_OP:
+            return packl_print_postunary_expr(expr.as.unary, indent);
+        default:
+            ASSERT(false, "unreachable");
+    }        
 }
 
 void packl_print_arg(PACKL_Arg arg, size_t indent) {
