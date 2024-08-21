@@ -89,3 +89,27 @@ proc main() {
 }
 
 ```
+
+## Arrays
+
+```nim
+
+proc main() {
+    var nums: array(int, 2) = {1, 2};
+    nums[0] = 0;
+    exit(nums[0]);
+}
+```
+
+## Strings 
+
+```nim
+use "std/string.packl" as string
+use "std/io.packl" as io
+
+proc main() {
+    var s: str = "djaoued";
+    io:println(string:toupper(s));
+    exit(0);
+}
+```

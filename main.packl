@@ -1,0 +1,8 @@
+use "string.packl" as string
+use "io.packl" as io
+
+proc main() {
+    var s: str = "djaoued";
+    io:println(string:toupper(s));
+    exit(0);
+}
