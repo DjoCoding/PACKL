@@ -11,18 +11,27 @@ char *token_kinds_str[] = {
     ":",
     ",",
 
+    "[",
+    "]",
     "(",
     ")",
     "{",
     "}",
+
     "=",
     "+",
+    "++",
     "-",
+    "--",
     "*",
     "/",
     "%",
+    "==",
     "<",
+
     ">",
+    "<=",
+    ">=",
     "!",
     "!=",
 
@@ -33,6 +42,15 @@ char *token_kinds_str[] = {
     "while",
     "use",
     "as",
+
+    "or",
+    "and",
+    "xor",
+
+    "array",
+    "int",
+    "str",
+    "ptr",
 };
 
 Node packl_init_node(Node_Kind kind, Location loc) {
@@ -310,6 +328,13 @@ PACKL_Type packl_parser_parse_type(PACKL_File *self) {
         type.kind = PACKL_TYPE_BASIC;
         type.as.basic = PACKL_TYPE_STR;
         return type;
+    }
+
+    if (token.kind == TOKEN_KIND_PTR_TYPE) {
+        padv(self);
+        type.kind = PACKL_TYPE_BASIC;
+        type.as.basic = PACKL_TYPE_PTR;
+        return type;    
     }
 
     PACKL_ERROR_LOC(self->filename, token.loc, "unknown type `" SV_FMT "`", SV_UNWRAP(token.text));

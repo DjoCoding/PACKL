@@ -1,6 +1,5 @@
-proc main() {    
-    var number: int = 1;
-    write(0, "The Programming Language: ", "PACKL\n");
-    write(0, "It's the programming language number ", number, " in the world\n");
+proc main() {
+    var p: ptr = alloc(10);
+    free(p);
     exit(0);
 }

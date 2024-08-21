@@ -166,7 +166,8 @@ enum Token_Kind {
     TOKEN_KIND_ARRAY,
     TOKEN_KIND_INT_TYPE,
     TOKEN_KIND_STR_TYPE,
-
+    TOKEN_KIND_PTR_TYPE,
+    
     TOKEN_KIND_END,
 
     COUNT_TOKEN_KINDS,
@@ -284,6 +285,8 @@ struct Expression {
 enum Type {
     PACKL_TYPE_INT = 0,
     PACKL_TYPE_STR,
+    PACKL_TYPE_PTR,
+    PACKL_TYPE_VOID,
     COUNT_PACKL_TYPES,
 };
 

@@ -51,11 +51,14 @@ char *keywords[] = {
     "array",
     "int",
     "str",
+    "ptr",
 };
 
 char *natives[] = {
     "write",
     "exit",
+    "alloc",
+    "free",
 };
 
 Token_Kind keyword_token_kinds[] = {
@@ -84,6 +87,7 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_ARRAY,
     TOKEN_KIND_INT_TYPE,
     TOKEN_KIND_STR_TYPE,
+    TOKEN_KIND_PTR_TYPE,
 };
 
 char packl_lexer_peek(PACKL_File *self) {

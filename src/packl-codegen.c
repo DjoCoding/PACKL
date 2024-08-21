@@ -1,6 +1,6 @@
 #include "packl-codegen.h"
 
-size_t data_type_size[COUNT_PACKL_TYPES] = {4, 8};
+size_t data_type_size[COUNT_PACKL_TYPES] = {4, 8, 8};
 
 PACKL_File packl_init_file(char *filename, char *fullpath);
 void packl_compile_file(PACKL_Compiler *c, PACKL_File *self);
@@ -21,6 +21,11 @@ size_t number_of_popped_values[] = {
     1,       // exit
 };
 
+
+#define PACKL_TYPE_INTEGER    ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT })
+#define PACKL_TYPE_POINTER    ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_PTR })
+#define PACKL_TYPE_NONE       ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_VOID })
+#define PACKL_TYPE_STRING     ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_STR  })
 
 void fprintfln(FILE *f) {
     fprintf(f, "\n");
@@ -290,6 +295,12 @@ void packl_check_if_type_and_operator_fits_together(PACKL_File *self, PACKL_Type
     if(type.kind == PACKL_TYPE_ARRAY) {
         PACKL_ERROR(self->filename, "no arithmetic or logic operators used with arrays");
     }
+    if (type.as.basic == PACKL_TYPE_STR) {
+        PACKL_ERROR(self->filename, "no arithmetic or logic operators used with strings");
+    }
+    if (type.as.basic == PACKL_TYPE_VOID) {
+        PACKL_ERROR(self->filename, "no arithmetic or logic operators used with void typed data");
+    }
 }
 
 int packl_check_type_equality(PACKL_Type type1, PACKL_Type type2) {
@@ -304,10 +315,25 @@ int packl_check_type_equality(PACKL_Type type1, PACKL_Type type2) {
 PACKL_Type packl_type_check(PACKL_File *self, PACKL_Type lhs_type, PACKL_Type rhs_type, Operator op) {
     packl_check_if_type_and_operator_fits_together(self, lhs_type, op);
     packl_check_if_type_and_operator_fits_together(self, rhs_type, op);
-    // for now only integers are supported
+    
+    
     if (lhs_type.as.basic == PACKL_TYPE_INT) {
+        if (rhs_type.as.basic == PACKL_TYPE_PTR) {
+            if (op == OP_PLUS) { return rhs_type; }
+            PACKL_ERROR(self->filename, "unexpected operator between an integer number and a pointer");
+        }
         return lhs_type;
     }
+
+    if (lhs_type.as.basic == PACKL_TYPE_PTR) {
+        if (rhs_type.as.basic == PACKL_TYPE_INT) {
+            if (op == OP_PLUS) { return lhs_type; }
+            if (op == OP_MINUS) { return lhs_type; }
+            PACKL_ERROR(self->filename, "unexpected operator between an integer number and a pointer");
+        }
+        PACKL_ERROR(self->filename, "can not make operations between two pointers");
+    }
+    
     ASSERT(false, "unreachable");
 }
 
@@ -327,8 +353,10 @@ void packl_setup_proc_params(PACKL_Compiler *c, PACKL_File *self, Parameters par
 void packl_print_expr_type(PACKL_Type type) {
     if(type.kind == PACKL_TYPE_BASIC) {
         switch(type.as.basic) {
-            case PACKL_TYPE_INT: fprintf(stderr, "int\n"); break;
-            case PACKL_TYPE_STR: fprintf(stderr, "str\n"); break;
+            case PACKL_TYPE_INT:  fprintf(stderr, "int\n"); break;
+            case PACKL_TYPE_STR:  fprintf(stderr, "str\n"); break;
+            case PACKL_TYPE_PTR:  fprintf(stderr, "ptr\n"); break;
+            case PACKL_TYPE_VOID: fprintf(stderr, "void\n"); break;
             default:
                 ASSERT(false, "unreachable");
         }
@@ -338,8 +366,6 @@ void packl_print_expr_type(PACKL_Type type) {
     }
 } 
 
-
-
 void packl_expect_type(PACKL_File *self, Location loc, PACKL_Type expected, PACKL_Type target) {
     if(packl_check_type_equality(expected, target)) {
         return;
@@ -347,10 +373,9 @@ void packl_expect_type(PACKL_File *self, Location loc, PACKL_Type expected, PACK
     PACKL_ERROR_LOC(self->filename, loc, "type mismatch");
 }
 
-
 PACKL_Type packl_generate_integer_expr_code(PACKL_Compiler *c, int64_t value, size_t indent) {
     packl_generate_push(c, value, indent);
-    return (PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT };
+    return PACKL_TYPE_INTEGER;
 }
 
 PACKL_Type packl_generate_identifier_expr_code(PACKL_Compiler *c, PACKL_File *self, String_View name, size_t indent) {
@@ -418,14 +443,20 @@ PACKL_Type packl_generate_binop_call_expr_code(PACKL_Compiler *c, PACKL_File *se
 
 PACKL_Type packl_generate_string_expr_code(PACKL_Compiler *c, PACKL_File *self, String_View value, size_t indent) {
     packl_generate_pushs(c, value, indent);
-    return (PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_STR };
+    return PACKL_TYPE_STRING;
+} 
+
+PACKL_Type packl_get_native_return_type(String_View native_name) {
+    if (sv_eq(native_name, SV("alloc"))) {
+        return PACKL_TYPE_POINTER;
+    }
+    return PACKL_TYPE_NONE;
 } 
 
 PACKL_Type packl_generate_native_call_code(PACKL_Compiler *c, PACKL_File *self, Func_Call native, size_t indent) {
     Node node = { .kind = NODE_KIND_NATIVE_CALL, .as.func_call = native, .loc = (Location) { 0, 0 } };
     packl_generate_native_call_node(c, self, node, indent);
-    // return packl_get_native_return_type(native.name);
-    return (PACKL_Type) {0};
+    return packl_get_native_return_type(native.name);
 }
 
 PACKL_Type packl_generate_mod_call_expr_code(PACKL_Compiler *c, PACKL_File *self, Mod_Call mod, size_t indent) {
@@ -641,8 +672,7 @@ void packl_generate_array_allocation_code(PACKL_Compiler *c, PACKL_File *self, A
     packl_generate_array_item_size(c, self, *arr_type.type, indent);
 
     PACKL_Type size_type = packl_generate_expr_code(c, self, arr_type.size, indent);
-    PACKL_Type expected_type = (PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT };
-    packl_expect_type(self, arr_type.size.loc, expected_type, size_type);
+    packl_expect_type(self, arr_type.size.loc, PACKL_TYPE_INTEGER, size_type);
 
     packl_generate_mul(c, indent);
     packl_generate_syscall(c, 2, indent); // the alloc syscall
@@ -669,8 +699,7 @@ void packl_reassign_array_item_code(PACKL_Compiler *c, PACKL_File *self, PACKL_T
 
     // generate the index
     PACKL_Type index_type = packl_generate_expr_code(c, self, index, indent);
-    PACKL_Type expected_type = (PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT };
-    packl_expect_type(self, index.loc, expected_type, index_type);
+    packl_expect_type(self, index.loc, PACKL_TYPE_INTEGER, index_type);
     // stack: arr sizeof(int) arr sizeof(int) 2
 
     // multiply the index with the item_size 
@@ -687,7 +716,7 @@ void packl_reassign_array_item_code(PACKL_Compiler *c, PACKL_File *self, PACKL_T
 
     // push the data 
     PACKL_Type value_type = packl_generate_expr_code(c, self, value, indent);
-    expected_type = *arr_type.as.array.type;
+    PACKL_Type expected_type = *arr_type.as.array.type;
     packl_expect_type(self, value.loc, expected_type, value_type);
     // stack: arr (arr + 2 * sizeof(int)) sizeof(int) 1
 
@@ -737,18 +766,16 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
     ASSERT(false, "unreachable");
 }
 
-void packl_reassign_str_char_code(PACKL_Compiler *c, PACKL_File *self, Expression value, Expression index, size_t indent) {
-    PACKL_Type expected_type = { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT };    
-    
+void packl_reassign_str_char_code(PACKL_Compiler *c, PACKL_File *self, Expression value, Expression index, size_t indent) {    
     packl_generate_dup(c, indent);
 
     PACKL_Type index_type = packl_generate_expr_code(c, self, index, indent);
-    packl_expect_type(self, index.loc, expected_type, index_type);
+    packl_expect_type(self, index.loc, PACKL_TYPE_INTEGER, index_type);
 
     packl_generate_add(c, indent);
 
     PACKL_Type value_type = packl_generate_expr_code(c, self, value, indent);
-    packl_expect_type(self, value.loc, expected_type, value_type);
+    packl_expect_type(self, value.loc, PACKL_TYPE_INTEGER, value_type);
 
     packl_generate_storeb(c, indent);
 }
@@ -938,10 +965,39 @@ void packl_generate_native_exit_code(PACKL_Compiler *c, PACKL_File *self, Node c
     Func_Call native_exit = caller.as.func_call;
 
     packl_check_caller_arity(self, caller, 1);
-    
-    packl_push_arguments(c, self, native_exit.args, indent);
+
+    Expression arg = native_exit.args.items[0].expr;
+
+    PACKL_Type type = packl_generate_expr_code(c, self, arg, indent);
+    packl_expect_type(self, arg.loc, PACKL_TYPE_INTEGER, type);    
 
     packl_generate_syscall(c, 6, indent);
+}
+
+void packl_generate_native_alloc_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_alloc = caller.as.func_call;
+
+    packl_check_caller_arity(self, caller, 1);
+
+    Expression arg = native_alloc.args.items[0].expr;
+
+    PACKL_Type type = packl_generate_expr_code(c, self, arg, indent);
+    packl_expect_type(self, arg.loc, PACKL_TYPE_INTEGER, type);    
+
+    packl_generate_syscall(c, 2, indent);
+}
+
+void packl_generate_native_free_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_free = caller.as.func_call;
+
+    packl_check_caller_arity(self, caller, 1);
+
+    Expression arg = native_free.args.items[0].expr;
+
+    PACKL_Type type = packl_generate_expr_code(c, self, arg, indent);
+    packl_expect_type(self, arg.loc, PACKL_TYPE_POINTER, type);    
+
+    packl_generate_syscall(c, 3, indent);
 }
 
 void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
@@ -953,6 +1009,14 @@ void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node n
 
     if (sv_eq(native.name, SV("exit"))) {
         return packl_generate_native_exit_code(c, self, node, indent);
+    }
+
+    if (sv_eq(native.name, SV("alloc"))) {
+        return packl_generate_native_alloc_code(c, self, node, indent);
+    }
+
+    if (sv_eq(native.name, SV("free"))) {
+        return packl_generate_native_free_code(c, self, node, indent);
     }
 
     ASSERT(false, "unreachable");

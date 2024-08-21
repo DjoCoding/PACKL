@@ -61,6 +61,7 @@ char *token_kinds[] = {
     "array",
     "type-int",
     "type-str",
+    "type-ptr",
 
     "end",
 };
