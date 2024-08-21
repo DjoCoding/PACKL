@@ -2,7 +2,7 @@
 
 size_t data_type_size[COUNT_PACKL_TYPES] = {4, 8};
 
-PACKL_File packl_init_file(char *filename);
+PACKL_File packl_init_file(char *filename, char *fullpath);
 void packl_compile_file(PACKL_Compiler *c, PACKL_File *self);
 
 void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_Type type, size_t indent);
@@ -928,11 +928,11 @@ void packl_generate_for_node(PACKL_Compiler *c, PACKL_File *self, Node for_node,
     packl_pop_context(self);
 }
 
-void packl_throw_file_used_twice_error(PACKL_Compiler *c, PACKL_File *self, char *filename) {
+void packl_throw_file_used_twice_error(PACKL_Compiler *c, PACKL_File *self, char *fullpath) {
     for(size_t i = 0; i < self->used_files.count; ++i) {
-        char *file = self->used_files.items[i].filename;
-        if (strcmp(file, filename) == 0) {
-            PACKL_ERROR(self->filename, "file `%s` used twice", filename);
+        char *file_fullpath = self->used_files.items[i].fullpath;
+        if (strcmp(file_fullpath, fullpath) == 0) {
+            PACKL_ERROR(self->filename, "file `%s` used twice", fullpath);
         }
     }
 }
@@ -957,16 +957,21 @@ void packl_generate_use_node(PACKL_Compiler *c, PACKL_File *self, Node use_node,
     Use use = use_node.as.use;
     
     char *filename = cstr_from_sv(use.filename);    
+    char *fullpath = malloc(sizeof(char) * FILENAME_MAX);
     
-    packl_throw_file_used_twice_error(c, self, filename);
-    packl_throw_circular_dependency_error(self, filename);
+    if (!realpath(filename, fullpath)) {
+        PACKL_ERROR_LOC(self->filename, use_node.loc, "failed to use the file %s", filename);
+    }
+    
+    packl_throw_file_used_twice_error(c, self, fullpath);
+    packl_throw_circular_dependency_error(self, fullpath);
 
     Context_Item new_module = packl_init_module_context_item(use.alias, filename);
     packl_push_item_in_current_context(self, new_module);
 
-    PACKL_File file = packl_init_file(filename);
+    PACKL_File file = packl_init_file(filename, fullpath);
 
-    packl_set_root_files(&file, self->root_files, self->filename);
+    packl_set_root_files(&file, self->root_files, self->fullpath);
 
     packl_compile_file(c, &file);
 
@@ -1079,9 +1084,12 @@ void packl_load_file(PACKL_File *self) {
     self->lexer.loc = (Location) {1, 1};
 } 
 
-PACKL_File packl_init_file(char *filename) {
+PACKL_File packl_init_file(char *filename, char *fullpath) {
     PACKL_File file = {0};
+    
     file.filename = filename;
+    file.fullpath = fullpath;
+
     packl_load_file(&file);
     DA_INIT(&file.root_files, sizeof(char *));
     DA_INIT(&file.used_files, sizeof(PACKL_File));

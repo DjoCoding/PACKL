@@ -21,14 +21,15 @@ func sum(s: str): int {
 }
 
 func toupper(s: str): str {
-	var size: int = string:len(s);
+	var size: int = len(s);
 	var current: int = 0;
 
 	for i: int in (0, size - 1) {
 		current = s[i];
 		if (current > 96) {
-			if (current < 97 + 26 + 1)
-			current = current - 97 + 65;
+			if (current < 97 + 26 + 1) {
+			    current = current - 97 + 65;
+            }
 			s[i] = current;
 		}
 	}

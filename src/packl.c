@@ -3,7 +3,14 @@
 PACKL_Compiler packl_init(char *input, char *output) {
     PACKL_Compiler c = {0};
     c.output = output;
-    c.root_file = packl_init_file(input);
+    char *fullpath = malloc(sizeof(char) * (FILENAME_MAX));
+    
+    if (!realpath(input, fullpath)) {
+        fprintf(stderr, "could not find the file %s\n", input);
+        exit(1);
+    }
+
+    c.root_file = packl_init_file(input, fullpath);
     return c;
 } 
 

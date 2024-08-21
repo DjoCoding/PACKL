@@ -10,7 +10,7 @@
 
 #define codegen packl_generate_file_code
 
-PACKL_File packl_init_file(char *filename);
+PACKL_File packl_init_file(char *filename, char *fullpath);
 void packl_generate_file_code(PACKL_Compiler *c, PACKL_File *self);
 
 #endif 

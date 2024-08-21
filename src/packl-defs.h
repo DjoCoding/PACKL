@@ -458,7 +458,7 @@ struct PACKL_External_Files {
 
 struct PACKL_File {
     char *filename;
-    char *path;
+    char *fullpath;
 
     Tokens tokens;
     AST ast;
