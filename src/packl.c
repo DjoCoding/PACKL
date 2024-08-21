@@ -101,6 +101,10 @@ void packl_destroy_while(While_Statement hwile) {
 }
 
 void packl_destroy_var_reassign(Var_Reassign var) {
+    if (var.kind == PACKL_TYPE_ARRAY) {
+        packl_destroy_expr(var.index);
+    }
+    
     packl_destroy_expr(var.expr);
 }
 

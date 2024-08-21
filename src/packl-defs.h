@@ -304,6 +304,8 @@ struct Func_Def {
 
 struct Var_Reassign {
     String_View name;
+    PACKL_Type_Kind kind;
+    Expression index;
     Expression expr;
 };
 

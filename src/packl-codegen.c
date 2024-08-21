@@ -525,7 +525,7 @@ void packl_generate_array_allocation_code(PACKL_Compiler *c, PACKL_File *self, A
     packl_generate_syscall(c, 2, indent); // the alloc syscall
 }
 
-void packl_generate_write_array_value_code(PACKL_Compiler *c, PACKL_File *self, PACKL_Type arr_type, Expression value, Expression index, size_t indent) {   
+void packl_reassign_array_item_code(PACKL_Compiler *c, PACKL_File *self, PACKL_Type arr_type, Expression value, Expression index, size_t indent) {   
     // example: arr[2] = 1; arr is a array of integers
     // stack: arr
 
@@ -587,7 +587,7 @@ void packl_handle_array_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declara
     for(size_t i = 0; i < arr.count; ++i) {
         // index for the push 
         Expression index = { .kind = EXPR_KIND_INTEGER, .as.integer = (int64_t)i };
-        packl_generate_write_array_value_code(c, self, arr_type, arr.items[i], index, indent);
+        packl_reassign_array_item_code(c, self, arr_type, arr.items[i], index, indent);
     }
 }
 
@@ -612,12 +612,42 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
 
 
     ASSERT(false, "unreachable");
-
 }
+
+void packl_reassign_str_char_code(PACKL_Compiler *c, PACKL_File *self, Expression value, Expression index, size_t indent) {
+    PACKL_Type expected_type = { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT };    
+    
+    packl_generate_dup(c, indent);
+
+    PACKL_Type index_type = packl_generate_expr_code(c, self, index, indent);
+    packl_expect_type(self, index.loc, expected_type, index_type);
+
+    packl_generate_add(c, indent);
+
+    PACKL_Type value_type = packl_generate_expr_code(c, self, value, indent);
+    packl_expect_type(self, value.loc, expected_type, value_type);
+
+    packl_generate_storeb(c, indent);
+}
+
 
 void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node var_reassign_node, size_t indent) {
     Var_Reassign var_reassign = var_reassign_node.as.var;
     Variable var = packl_find_variable(self, var_reassign.name, var_reassign_node.loc);
+
+
+    if (var_reassign.kind == PACKL_TYPE_ARRAY) {
+        packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
+
+        if (var.type.kind == PACKL_TYPE_BASIC && var.type.as.basic == PACKL_TYPE_STR) {
+            packl_reassign_str_char_code(c, self, var_reassign.expr, var_reassign.index, indent);
+        } else {
+            packl_reassign_array_item_code(c, self, var.type, var_reassign.expr, var_reassign.index, indent);
+        }
+
+        return packl_generate_pop(c, indent);
+    }
+
 
     PACKL_Type expr_type = packl_generate_expr_code(c, self, var_reassign.expr, indent);
     PACKL_Type expected_type = var.type;

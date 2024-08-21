@@ -319,6 +319,17 @@ void packl_print_var_reassign(Var_Reassign var, size_t indent) {
     print_indent(indent);
     printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var.name));
 
+    if(var.kind == PACKL_TYPE_ARRAY) {
+        print_indent(indent);
+        printf("type: array\n");
+        print_indent(indent);
+        printf("index:\n");
+        packl_print_expr(var.index, indent + 1);
+    } else {
+        print_indent(indent);
+        printf("type: basic\n");
+    }
+
     print_indent(indent);
     printf("value:\n");
     packl_print_expr(var.expr, indent + 1);

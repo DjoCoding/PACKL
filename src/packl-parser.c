@@ -588,6 +588,15 @@ Var_Reassign packl_parser_parse_var_reassign(PACKL_File *self) {
     pexp(self, TOKEN_KIND_IDENTIFIER, &token);
     var.name = token.text;
 
+    if (ppeek(self).kind == TOKEN_KIND_OPEN_BRACKET) {
+        var.kind = PACKL_TYPE_ARRAY;
+        padv(self);
+        var.index = packl_parser_parse_expr(self);
+        pexp(self, TOKEN_KIND_CLOSE_BRACKET, NULL);
+    } else {
+        var.kind = PACKL_TYPE_BASIC;
+    }
+
     pexp(self, TOKEN_KIND_EQUAL, NULL);
 
     var.expr = packl_parser_parse_expr(self);
@@ -606,6 +615,12 @@ Node packl_parser_parse_identifier(PACKL_File *self) {
     if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_PARENT) {
         node.kind = NODE_KIND_FUNC_CALL;
         node.as.func_call = packl_parser_parse_func_call(self);
+        return node;
+    }
+
+    if (ppeek_(self, 1).kind == TOKEN_KIND_OPEN_BRACKET) {
+        node.kind = NODE_KIND_VAR_REASSIGN;
+        node.as.var = packl_parser_parse_var_reassign(self);
         return node;
     }
 

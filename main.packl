@@ -1,6 +1,0 @@
-use "string.packl" as string 
-
-proc main() {
-    var s: str = "Djaoued";
-    exit(string:sum(s));
-}
