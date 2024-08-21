@@ -87,13 +87,11 @@ proc main() {
     io:println("PACKL");
     exit(0);
 }
-
 ```
 
 ## Arrays
 
 ```nim
-
 proc main() {
     var nums: array(int, 2) = {1, 2};
     nums[0] = 0;
@@ -111,5 +109,31 @@ proc main() {
     var s: str = "djaoued";
     io:println(string:toupper(s));
     exit(0);
+}
+```
+
+## Comments 
+
+```nim
+# this is a comment
+```
+
+## Operators
+
+```nim 
+proc main() {
+    var n: int = 20;
+    var a: int = 10;
+    var b: int = a++;          # b = 10 and a = 11
+    var c: int = a--;          # c = 11 and a = 10
+    var d: int = a <= 10       # d = 1
+    var e: int = a >= 10       # e = 1
+    var f: int = a < 10        # f = 0
+    var g: int = a > 10        # g = 0
+    var h: int = a == 10       # h = 1
+    var i: int = a != 10       # i = 0
+    var j: int = a and n       # j = 1
+    var k: int = a or n        # k = 1
+    var l: int = a xor n       # l = 30
 }
 ```
