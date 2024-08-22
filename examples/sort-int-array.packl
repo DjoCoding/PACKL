@@ -1,0 +1,75 @@
+func random(current: int, max: int): int {
+    random = (current * 27 + 11) % max;
+}
+
+func arr_alloc(size: int, item_size: int): ptr {
+    arr_alloc = malloc(size * item_size);
+}
+
+func arr_get_item(arr: ptr, index: int, item_size: int): int {
+    arr_get_item = mload(arr + item_size * index, item_size);
+}
+
+proc arr_set_item(arr: ptr, index: int, value: int, item_size: int) {
+    mset(arr + index * item_size, value, item_size);
+}
+
+proc arr_randomize(arr: ptr, size: int, item_size: int) {
+    var current_item: ptr = arr;
+    var current_value: int = 331;
+
+    for i: int in (0, size - 1) {
+        current_value = random(current_value, 100);
+        arr_set_item(arr, i, current_value, item_size);
+    }
+}
+
+proc arr_display(arr: ptr, size: int, item_size: int) {
+    var value: int = 0;
+
+    write(0, "[ ");
+    for i: int in (0, size - 1) {
+        write(0, arr_get_item(arr, i, item_size), " ");
+    }
+    write(0, "]\n");
+}
+
+proc arr_swap(arr: ptr, i: int, j: int, item_size: int) {
+    var first: int = arr_get_item(arr, i, item_size);
+    var second: int = arr_get_item(arr, j, item_size);
+    arr_set_item(arr, i, second, item_size);
+    arr_set_item(arr, j, first, item_size);
+}
+
+
+proc arr_sort(arr: ptr, size: int, item_size: int) {
+    var min_index: int = 0;       # the index of the item who has the minimum value
+
+    for i: int in (0, size - 1) {
+        min_index = i;
+        for j: int in (i + 1, size - 1) {
+            if (arr_get_item(arr, min_index, item_size) > arr_get_item(arr, j, item_size)) {
+                min_index = j;
+            }
+        }
+        arr_swap(arr, i, min_index, item_size);
+    }
+}
+
+
+proc main() {
+    var i: int = 0;
+    var size: int = 10;
+    
+    var arr: ptr = arr_alloc(size, sizeof(i));
+    
+    arr_randomize(arr, size, sizeof(i));
+    arr_display(arr, size, sizeof(i));
+
+    arr_sort(arr, size, sizeof(i));
+    arr_display(arr, size, sizeof(i));
+
+    mdealloc(arr);
+    
+    exit(0);
+}

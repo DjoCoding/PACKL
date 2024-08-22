@@ -57,8 +57,10 @@ char *keywords[] = {
 char *natives[] = {
     "write",
     "exit",
-    "alloc",
-    "free",
+    "malloc",
+    "mdealloc",
+    "mload",
+    "mset",
     "sizeof",
 };
 

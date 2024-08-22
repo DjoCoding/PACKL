@@ -1,4 +1,5 @@
 #include "src/packl.h"
+#include <time.h>
 
 typedef struct {
     char **value;
@@ -55,6 +56,8 @@ void handle_flags(Args *args, char *program, char **output) {
 }
 
 int main(int argc, char **argv) {
+    srand(time(NULL));
+
     Args args = { argv, argc };
 
     char *program = args_shift(&args);

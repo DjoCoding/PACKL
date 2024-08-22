@@ -162,6 +162,11 @@ void packl_print_basic_type(Type type, size_t indent) {
         printf("str-type\n");
         return;
     }
+    
+    if (type == PACKL_TYPE_PTR) {
+        printf("ptr-type\n");
+        return;
+    }
 
     ASSERT(false, "unreachable");
 }

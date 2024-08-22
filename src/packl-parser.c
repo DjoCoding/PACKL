@@ -36,13 +36,17 @@ char *token_kinds_str[] = {
     "!=",
 
     "proc",
+    "func",
+    "return",
     "var",
     "if",
     "else",
     "while",
+    "for",
+    "in",
     "use",
     "as",
-
+    
     "or",
     "and",
     "xor",

@@ -30,7 +30,5 @@ int main(int argc, char **argv) {
     system(command);
 
     sprintf(command, "rm file.pasm file.pvm\n");
-    system(command);
-
-    return 0;
+    return system(command);
 }

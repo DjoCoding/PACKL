@@ -1,6 +1,6 @@
 #include "packl-codegen.h"
 
-size_t data_type_size[COUNT_PACKL_TYPES] = {4, 8, 8};
+size_t data_type_size[COUNT_PACKL_TYPES] = {8, 8, 8};
 
 PACKL_File packl_init_file(char *filename, char *fullpath);
 void packl_compile_file(PACKL_Compiler *c, PACKL_File *self);
@@ -452,8 +452,12 @@ PACKL_Type packl_generate_string_expr_code(PACKL_Compiler *c, PACKL_File *self, 
 } 
 
 PACKL_Type packl_get_native_return_type(String_View native_name) {
-    if (sv_eq(native_name, SV("alloc"))) {
+    if (sv_eq(native_name, SV("malloc"))) {
         return PACKL_TYPE_POINTER;
+    }
+
+    if (sv_eq(native_name, SV("mload"))) {
+        return PACKL_TYPE_INTEGER;
     }
     
     if (sv_eq(native_name, SV("sizeof"))) {
@@ -991,12 +995,12 @@ void packl_generate_native_exit_code(PACKL_Compiler *c, PACKL_File *self, Node c
     packl_generate_syscall(c, 6, indent);
 }
 
-void packl_generate_native_alloc_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
-    Func_Call native_alloc = caller.as.func_call;
+void packl_generate_native_malloc_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_malloc = caller.as.func_call;
 
     packl_check_caller_arity(self, caller, 1);
 
-    Expression arg = native_alloc.args.items[0].expr;
+    Expression arg = native_malloc.args.items[0].expr;
 
     PACKL_Type type = packl_generate_expr_code(c, self, arg, indent);
     packl_expect_type(self, arg.loc, PACKL_TYPE_INTEGER, type);    
@@ -1004,12 +1008,12 @@ void packl_generate_native_alloc_code(PACKL_Compiler *c, PACKL_File *self, Node 
     packl_generate_syscall(c, 2, indent);
 }
 
-void packl_generate_native_free_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
-    Func_Call native_free = caller.as.func_call;
+void packl_generate_native_mdealloc_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_mdealloc = caller.as.func_call;
 
     packl_check_caller_arity(self, caller, 1);
 
-    Expression arg = native_free.args.items[0].expr;
+    Expression arg = native_mdealloc.args.items[0].expr;
 
     PACKL_Type type = packl_generate_expr_code(c, self, arg, indent);
     packl_expect_type(self, arg.loc, PACKL_TYPE_POINTER, type);    
@@ -1033,6 +1037,44 @@ void packl_generate_native_sizeof_code(PACKL_Compiler *c, PACKL_File *self, Node
     packl_generate_push(c, data_type_size[var.type.as.basic], indent);
 }
 
+void packl_generate_native_mload_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_mload = caller.as.func_call;
+
+    packl_check_caller_arity(self, caller, 2);
+
+    Expression ptr_arg = native_mload.args.items[0].expr;
+    Expression size_arg = native_mload.args.items[1].expr;
+
+    PACKL_Type type = packl_generate_expr_code(c, self, ptr_arg, indent);
+    packl_expect_type(self, ptr_arg.loc, PACKL_TYPE_POINTER, type);
+
+    type = packl_generate_expr_code(c, self, size_arg, indent);
+    packl_expect_type(self, ptr_arg.loc, PACKL_TYPE_INTEGER, type);
+
+    packl_generate_load(c, indent);
+}
+
+void packl_generate_native_mset_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_mset = caller.as.func_call;
+
+    packl_check_caller_arity(self, caller, 3);
+
+    Expression ptr_arg = native_mset.args.items[0].expr;
+    Expression data_arg = native_mset.args.items[1].expr;
+    Expression size_arg = native_mset.args.items[2].expr;
+
+    PACKL_Type type = packl_generate_expr_code(c, self, ptr_arg, indent);
+    packl_expect_type(self, ptr_arg.loc, PACKL_TYPE_POINTER, type);
+
+    type = packl_generate_expr_code(c, self, data_arg, indent);
+    packl_expect_type(self, ptr_arg.loc, PACKL_TYPE_INTEGER, type);
+
+    type = packl_generate_expr_code(c, self, size_arg, indent);
+    packl_expect_type(self, ptr_arg.loc, PACKL_TYPE_INTEGER, type);
+
+    packl_generate_store(c, indent);
+}
+
 void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
     Func_Call native = node.as.func_call;
 
@@ -1044,12 +1086,20 @@ void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node n
         return packl_generate_native_exit_code(c, self, node, indent);
     }
 
-    if (sv_eq(native.name, SV("alloc"))) {
-        return packl_generate_native_alloc_code(c, self, node, indent);
+    if (sv_eq(native.name, SV("malloc"))) {
+        return packl_generate_native_malloc_code(c, self, node, indent);
     }
 
-    if (sv_eq(native.name, SV("free"))) {
-        return packl_generate_native_free_code(c, self, node, indent);
+    if (sv_eq(native.name, SV("mdealloc"))) {
+        return packl_generate_native_mdealloc_code(c, self, node, indent);
+    }
+
+    if (sv_eq(native.name, SV("mload"))) {
+        return packl_generate_native_mload_code(c, self, node, indent);
+    }
+
+    if (sv_eq(native.name, SV("mset"))) {
+        return packl_generate_native_mset_code(c, self, node, indent);
     }
 
     if (sv_eq(native.name, SV("sizeof"))) {
