@@ -1,5 +1,0 @@
-proc main() {
-    var p: ptr = alloc(10);
-    free(p);
-    exit(0);
-}

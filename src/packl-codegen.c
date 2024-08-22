@@ -306,6 +306,11 @@ void packl_check_if_type_and_operator_fits_together(PACKL_File *self, PACKL_Type
 int packl_check_type_equality(PACKL_Type type1, PACKL_Type type2) {
     if (type1.kind != type2.kind) { return 0; }
     if (type1.kind == PACKL_TYPE_BASIC) {
+        if ((type1.as.basic == PACKL_TYPE_INT && type2.as.basic == PACKL_TYPE_PTR)
+                || 
+            (type1.as.basic == PACKL_TYPE_PTR && type2.as.basic == PACKL_TYPE_INT))
+            { return 1; }
+        
         if(type1.as.basic != type2.as.basic) { return 0; }
         return 1;
     }
@@ -450,6 +455,11 @@ PACKL_Type packl_get_native_return_type(String_View native_name) {
     if (sv_eq(native_name, SV("alloc"))) {
         return PACKL_TYPE_POINTER;
     }
+    
+    if (sv_eq(native_name, SV("sizeof"))) {
+        return PACKL_TYPE_INTEGER;
+    }
+
     return PACKL_TYPE_NONE;
 } 
 
@@ -611,6 +621,9 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
             return packl_generate_preunary_expr_code(c, self, expr.as.unary, indent);
         case EXPR_KIND_POST_UNARY_OP:
             return packl_generate_postunary_expr_code(c, self, expr.as.unary, indent);
+        case EXPR_KIND_NOT_INITIALIZED:
+            packl_generate_push(c, 0, indent);
+            return PACKL_TYPE_INTEGER;
         default:
             ASSERT(false, "unreachable");
     }
@@ -633,8 +646,12 @@ void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc
     
     packl_push_new_context(self);
 
-    size_t stack_size = c->stack_size;
-    c->stack_size = proc_def.params.count;
+    // size_t stack_size = c->stack_size;
+    // c->stack_size = proc_def.params.count;
+
+    size_t initial_stack_size = c->stack_size;
+    c->stack_size += proc_def.params.count;
+    size_t after_args_push_stack_size = c->stack_size;
 
     packl_setup_proc_params(c, self, proc_def.params);
 
@@ -642,8 +659,8 @@ void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc
 
     packl_generate_statements(c, self, *proc_def.body, indent + 1);
 
-    packl_pop_proc_scope(c, proc_def.params.count, indent + 1);
-    c->stack_size = stack_size;
+    packl_pop_proc_scope(c, after_args_push_stack_size, indent + 1);
+    c->stack_size = initial_stack_size;
 
     packl_pop_context(self);
     packl_generate_ret(c, indent + 1);
@@ -1000,6 +1017,22 @@ void packl_generate_native_free_code(PACKL_Compiler *c, PACKL_File *self, Node c
     packl_generate_syscall(c, 3, indent);
 }
 
+void packl_generate_native_sizeof_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
+    Func_Call native_sizeof = caller.as.func_call;
+
+    packl_check_caller_arity(self, caller, 1);
+
+    Expression arg = native_sizeof.args.items[0].expr;
+
+    if (arg.kind != EXPR_KIND_ID) {
+        PACKL_ERROR_LOC(self->filename, caller.loc, "`sizeof` function can be called only on variables");
+    }
+
+    Variable var = packl_find_variable(self, arg.as.value, caller.loc);
+
+    packl_generate_push(c, data_type_size[var.type.as.basic], indent);
+}
+
 void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
     Func_Call native = node.as.func_call;
 
@@ -1017,6 +1050,10 @@ void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node n
 
     if (sv_eq(native.name, SV("free"))) {
         return packl_generate_native_free_code(c, self, node, indent);
+    }
+
+    if (sv_eq(native.name, SV("sizeof"))) {
+        return packl_generate_native_sizeof_code(c, self, node, indent);
     }
 
     ASSERT(false, "unreachable");
@@ -1224,16 +1261,12 @@ void packl_generate_mod_call_node(PACKL_Compiler *c, PACKL_File *self, Node call
 
 void packl_generate_statement(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
     switch(node.kind) {
-        case NODE_KIND_PROC_DEF:
-            return packl_generate_proc_def_code(c, self, node, indent);
         case NODE_KIND_VAR_DECLARATION:
             return packl_generate_var_dec_node(c, self, node, indent);
         case NODE_KIND_VAR_REASSIGN:
             return packl_generate_var_reassign_node(c, self, node, indent);
         case NODE_KIND_FUNC_CALL:
             return packl_generate_call_node(c, self, node, indent);
-        case NODE_KIND_FUNC_DEF:
-            return packl_generate_func_def_code(c, self, node, indent);
         case NODE_KIND_NATIVE_CALL:
             return packl_generate_native_call_node(c, self, node, indent);
         case NODE_KIND_IF:
@@ -1242,12 +1275,25 @@ void packl_generate_statement(PACKL_Compiler *c, PACKL_File *self, Node node, si
             return packl_generate_while_node(c, self, node, indent);
         case NODE_KIND_FOR:
             return packl_generate_for_node(c, self, node, indent);
-        case NODE_KIND_USE:
-            return packl_generate_use_node(c, self, node, indent);
         case NODE_KIND_MOD_CALL:
             return packl_generate_mod_call_node(c, self, node, indent);
         default:
-            ASSERT(false, "unreachable");
+            PACKL_ERROR_LOC(self->filename, node.loc, "unexpected token found");
+    }
+}
+
+void packl_generate_global_statement(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
+    switch(node.kind) {
+        case NODE_KIND_USE:
+            return packl_generate_use_node(c, self, node, indent);
+        case NODE_KIND_VAR_DECLARATION:
+            return packl_generate_var_dec_node(c, self, node, indent);
+        case NODE_KIND_PROC_DEF:
+            return packl_generate_proc_def_code(c, self, node, indent);
+        case NODE_KIND_FUNC_DEF:
+            return packl_generate_func_def_code(c, self, node, indent);
+        default:
+            PACKL_ERROR_LOC(self->filename, node.loc, "unexpected token, consider starting a definition by a procedure, a function, a global variable declarations");
     }
 }
 
@@ -1256,6 +1302,13 @@ void packl_generate_statements(PACKL_Compiler *c, PACKL_File *self, AST nodes, s
     for (size_t i = 0; i < nodes.count; ++i) {
         Node node = nodes.items[i];
         packl_generate_statement(c, self, node, indent);
+    }
+}
+
+void packl_generate_global_statements(PACKL_Compiler *c, PACKL_File *self, AST nodes, size_t indent) {
+    for (size_t i = 0; i < nodes.count; ++i) {
+        Node node = nodes.items[i];
+        packl_generate_global_statement(c, self, node, indent);
     }
 }
 
@@ -1279,7 +1332,7 @@ void packl_generate_file_code(PACKL_Compiler *c, PACKL_File *self) {
     // push the global context
     packl_push_new_context(self);
 
-    packl_generate_statements(c, self, self->ast, 0);
+    packl_generate_global_statements(c, self, self->ast, 0);
 
     if (c->has_entry) {
         PACKL_ERROR(self->filename, "found two main entry points, first defined here `%s`", c->entry_file_path);

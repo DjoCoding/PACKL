@@ -374,6 +374,11 @@ Var_Declaration packl_parser_parse_var_dec(PACKL_File *self) {
     
     var_dec.type = packl_parser_parse_type(self);
 
+    if (ppeek(self).kind == TOKEN_KIND_SEMI_COLON) {
+        var_dec.value.kind = EXPR_KIND_NOT_INITIALIZED;
+        return var_dec;
+    }
+
     pexp(self, TOKEN_KIND_EQUAL, NULL);
 
     if(ppeek(self).kind == TOKEN_KIND_OPEN_CURLY_BRACE) {

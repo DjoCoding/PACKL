@@ -27,10 +27,10 @@ int main(int argc, char **argv) {
     }
     
     sprintf(command, "./bin/pvmr file.pvm\n");
-    if (system(command)) {
-        fprintf(stderr, "execution failed\n");
-        exit(1);
-    }
+    system(command);
+
+    sprintf(command, "rm file.pasm file.pvm\n");
+    system(command);
 
     return 0;
 }

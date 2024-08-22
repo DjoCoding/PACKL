@@ -59,6 +59,7 @@ char *natives[] = {
     "exit",
     "alloc",
     "free",
+    "sizeof",
 };
 
 Token_Kind keyword_token_kinds[] = {
