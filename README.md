@@ -158,18 +158,14 @@ record Point {
     y: int;
 };
 
-proc print_point(p: Point) {
-    write(0, "(", p.x, ", ", p.y, ")\n");
-}
-
 proc main() {
     var p: Point;
     p.x = 1;
     p.y = 2;
-    print_point(p);
-    exit(p.x - 1);
+    write(0, "(", p.x, ", ", p.y, ")\n");
+    exit(0);
 }
-`
+```
 
 
 # Note
