@@ -51,6 +51,7 @@ typedef struct Proc_Def Proc_Def;
 typedef struct Use Use;
 
 // expression
+typedef struct Expr_Field Expr_Field;
 typedef enum Operator Operator;
 typedef struct Expr_Unary_Op Expr_Unary_Op;
 typedef struct Expr_Bin_Op Expr_Bin_Op;
@@ -76,6 +77,11 @@ typedef struct PACKL_Arg PACKL_Arg;
 typedef struct PACKL_Args PACKL_Args;
 typedef struct Func_Call Func_Call;
 
+// Variable 
+typedef union Variable_Format_As Variable_Format_As;
+typedef enum Variable_Format_Kind Variable_Format_Kind;
+typedef struct Variable_Format Variable_Format;
+
 // variable declaration
 typedef struct Var_Declaration Var_Declaration;
 
@@ -87,6 +93,11 @@ typedef enum Mod_Call_Kind Mod_Call_Kind;
 typedef union Mod_Call_As Mod_Call_As;
 typedef struct Mod_Call Mod_Call;
 
+// record
+typedef struct Record_Def Record_Def;
+typedef Parameter Field;
+typedef Parameters Fields;
+
 // Nodes 
 typedef enum Node_Kind Node_Kind;
 typedef union Node_As Node_As;
@@ -95,6 +106,7 @@ typedef struct Node Node;
 typedef struct AST AST;
 
 // Context 
+typedef struct Record Record;
 typedef struct Module Module;
 typedef struct Function Function;
 typedef struct Variable Variable;
@@ -121,6 +133,7 @@ enum Token_Kind {
     TOKEN_KIND_SEMI_COLON,
     TOKEN_KIND_COLON,
     TOKEN_KIND_COMMA,
+    TOKEN_KIND_DOT,
 
     TOKEN_KIND_OPEN_BRACKET,
     TOKEN_KIND_CLOSE_BRACKET,
@@ -158,6 +171,7 @@ enum Token_Kind {
     TOKEN_KIND_IN,
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
+    TOKEN_KIND_RECORD,
 
     TOKEN_KIND_OR,
     TOKEN_KIND_AND,
@@ -205,6 +219,7 @@ enum Node_Kind {
     NODE_KIND_FOR,
     NODE_KIND_USE,
     NODE_KIND_MOD_CALL,
+    NODE_KIND_RECORD,
 };
 
 
@@ -231,6 +246,7 @@ enum Expr_Kind {
     EXPR_KIND_MOD_CALL,
     EXPR_KIND_ARRAY,
     EXPR_KIND_ARRAY_INDEXING,
+    EXPR_KIND_RECORD_FIELD,
     EXPR_KIND_NOT_INITIALIZED,
 };
 
@@ -264,6 +280,10 @@ struct Expr_Unary_Op {
     Operator op;
 };
 
+struct Expr_Field {
+    String_View root;
+    String_View field;
+};
 
 union Expr_As {
     Expr_Bin_Op bin;
@@ -274,6 +294,7 @@ union Expr_As {
     Mod_Call *mod;
     Expr_Arr arr;
     Expr_Arr_Index arr_index;
+    Expr_Field field;
 };
 
 struct Expression {
@@ -292,17 +313,19 @@ enum Type {
 
 struct Array_Type {
     PACKL_Type *type;
-    Expression size;
+    size_t size;
 };
 
 enum PACKL_Type_Kind {
     PACKL_TYPE_BASIC,
     PACKL_TYPE_ARRAY,
+    PACKL_TYPE_USER_DEFINED,
 };
 
 union PACKL_Type_As {
     Type basic;
     Array_Type array;
+    String_View user_defined;
 };
 
 struct PACKL_Type {
@@ -339,11 +362,26 @@ struct Func_Def {
     PACKL_Type return_type;
 };
 
-struct Var_Reassign {
-    String_View name;
-    PACKL_Type_Kind kind;
+enum Variable_Format_Kind {
+    VARIABLE_FORMAT_BASIC,
+    VARIABLE_FORMAT_ARRAY,
+    VARIABLE_FORMAT_RECORD,
+};
+
+union Variable_Format_As {
     Expression index;
-    Expression expr;
+    String_View field;
+};
+
+struct Variable_Format {
+    String_View name;
+    Variable_Format_Kind kind;
+    Variable_Format_As as;
+};
+
+struct Var_Reassign {
+    Variable_Format format;
+    Expression value;
 };
 
 struct While_Statement {
@@ -403,6 +441,11 @@ struct Mod_Call {
     Mod_Call_As as;
 };
 
+struct Record_Def {
+    String_View name;
+    Fields fields;
+};
+
 union Node_As {
     Func_Call func_call;
     Proc_Def proc_def;
@@ -416,6 +459,7 @@ union Node_As {
     Expression ret;
     Use use;
     Mod_Call mod_call;
+    Record_Def record;
 };
 
 struct Node {
@@ -454,11 +498,17 @@ struct Module {
     char *filename;
 };
 
+struct Record {
+    size_t size;
+    Fields fields;
+};
+
 enum Context_Item_Type {
     CONTEXT_ITEM_TYPE_PROCEDURE = 0,
     CONTEXT_ITEM_TYPE_VARIABLE,
     CONTEXT_ITEM_TYPE_FUNCTION,
     CONTEXT_ITEM_TYPE_MODULE,
+    CONTEXT_ITEM_TYPE_RECORD,
 };
 
 union Context_Item_As {
@@ -466,6 +516,7 @@ union Context_Item_As {
     Variable variable;
     Function func;
     Module module;
+    Record record;
 };
 
 struct Context_Item {

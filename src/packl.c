@@ -41,6 +41,7 @@ void packl_destroy_type(PACKL_Type type) {
         free(type.as.array.type);
         return;
     }
+    if (type.kind == PACKL_TYPE_USER_DEFINED) { return; }
     ASSERT(false, "unreachable");
 }
 
@@ -118,11 +119,11 @@ void packl_destroy_while(While_Statement hwile) {
 }
 
 void packl_destroy_var_reassign(Var_Reassign var) {
-    if (var.kind == PACKL_TYPE_ARRAY) {
-        packl_destroy_expr(var.index);
+    if (var.format.kind == VARIABLE_FORMAT_ARRAY) {
+        packl_destroy_expr(var.format.as.index);
     }
     
-    packl_destroy_expr(var.expr);
+    packl_destroy_expr(var.value);
 }
 
 void packl_destroy_func_def(Func_Def func) {
@@ -141,6 +142,10 @@ void packl_destroy_mod_call(Mod_Call mod_call) {
     if (mod_call.kind == MODULE_CALL_FUNC_CALL) {
         packl_destroy_func_call(mod_call.as.func_call);
     }
+}
+
+void packl_destroy_record(Record_Def record) {
+    free(record.fields.items);
 }
 
 void packl_destroy_node(Node node) {
@@ -169,6 +174,8 @@ void packl_destroy_node(Node node) {
             return;
         case NODE_KIND_MOD_CALL:
             return packl_destroy_mod_call(node.as.mod_call);
+        case NODE_KIND_RECORD:
+            return packl_destroy_record(node.as.record);
         default:
             ASSERT(false, "unreachable");
     }

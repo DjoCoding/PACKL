@@ -151,5 +151,26 @@ proc main() {
 }
 ```
 
+## Basic Records
+```nim 
+record Point {
+    x: int;
+    y: int;
+};
+
+proc print_point(p: Point) {
+    write(0, "(", p.x, ", ", p.y, ")\n");
+}
+
+proc main() {
+    var p: Point;
+    p.x = 1;
+    p.y = 2;
+    print_point(p);
+    exit(p.x - 1);
+}
+`
+
+
 # Note
 the PACKL programming language is still not a stable language, don't expect much from it!

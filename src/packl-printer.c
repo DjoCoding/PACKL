@@ -53,6 +53,8 @@ char *token_kinds[] = {
 
     "use",
     "as",
+
+    "record",
     
     "or",
     "and",
@@ -178,8 +180,7 @@ void packl_print_array_type(Array_Type type, size_t indent) {
     printf("type: array\n");
     packl_print_type(*type.type, indent + 1);
     print_indent(indent);
-    printf("size:\n");
-    packl_print_expr(type.size, indent + 1);
+    printf("size: %zu\n", (size_t)type.size);
 }
 
 void packl_print_type(PACKL_Type type, size_t indent) {
@@ -191,6 +192,12 @@ void packl_print_type(PACKL_Type type, size_t indent) {
 
     if (type.kind == PACKL_TYPE_ARRAY) {
         packl_print_array_type(type.as.array, indent);
+        return;
+    }
+
+    if (type.kind == PACKL_TYPE_USER_DEFINED) {
+        print_indent(indent);
+        printf("user-defined: `" SV_FMT "`\n", SV_UNWRAP(type.as.user_defined));
         return;
     }
 
@@ -285,6 +292,10 @@ void packl_print_expr(Expression expr, size_t indent) {
             return packl_print_preunary_expr(expr.as.unary, indent);
         case EXPR_KIND_POST_UNARY_OP:
             return packl_print_postunary_expr(expr.as.unary, indent);
+        case EXPR_KIND_NOT_INITIALIZED:
+            print_indent(indent);
+            printf("not initialized\n");
+            return;
         default:
             ASSERT(false, "unreachable");
     }        
@@ -319,7 +330,7 @@ void packl_print_param(Parameter param, size_t indent) {
     print_indent(indent);
     printf("name: `" SV_FMT "`", SV_UNWRAP(param.name));
     print_indent(indent);
-    printf("type:\n");
+    printf("type:");
     packl_print_type(param.type, indent);
 }
 
@@ -419,16 +430,28 @@ void packl_print_mod_call(Mod_Call mod_call, size_t indent) {
     }
 }
 
+void packl_print_record(Record_Def record, size_t indent) {
+    print_indent(indent);
+    printf("record name: `" SV_FMT "`\n", SV_UNWRAP(record.name));
+    
+    print_indent(indent);
+    printf("fields\n");
+    packl_print_params(record.fields, indent + 1);
+}
+
 void packl_print_var_reassign(Var_Reassign var, size_t indent) {
     print_indent(indent);
-    printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var.name));
+    printf("variable name: `" SV_FMT "`\n", SV_UNWRAP(var.format.name));
 
-    if(var.kind == PACKL_TYPE_ARRAY) {
+    if(var.format.kind == VARIABLE_FORMAT_ARRAY) {
         print_indent(indent);
         printf("type: array\n");
         print_indent(indent);
         printf("index:\n");
-        packl_print_expr(var.index, indent + 1);
+        packl_print_expr(var.format.as.index, indent + 1);
+    } else if (var.format.kind == VARIABLE_FORMAT_RECORD) {
+        print_indent(indent);
+        printf("type: field, `" SV_FMT "`\n", SV_UNWRAP(var.format.as.field));
     } else {
         print_indent(indent);
         printf("type: basic\n");
@@ -436,7 +459,7 @@ void packl_print_var_reassign(Var_Reassign var, size_t indent) {
 
     print_indent(indent);
     printf("value:\n");
-    packl_print_expr(var.expr, indent + 1);
+    packl_print_expr(var.value, indent + 1);
 }
 
 void packl_print_func_def(Func_Def func, size_t indent) {
@@ -522,6 +545,12 @@ void packl_print_mod_call_node(Node node, size_t indent) {
     packl_print_mod_call(node.as.mod_call, indent + 1);
 }
 
+void packl_print_record_def_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: record defintion\n");
+    packl_print_record(node.as.record, indent + 1);
+}
+
 void packl_print_ast_node(Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_NATIVE_CALL:
@@ -548,6 +577,8 @@ void packl_print_ast_node(Node node, size_t indent) {
             return packl_print_use_node(node, indent);
         case NODE_KIND_MOD_CALL:
             return packl_print_mod_call_node(node, indent);
+        case NODE_KIND_RECORD:
+            return packl_print_record_def_node(node, indent);
         default:
             ASSERT(false, "unreachable");
     }

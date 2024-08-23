@@ -1,7 +1,5 @@
 #include "packl-codegen.h"
 
-size_t data_type_size[COUNT_PACKL_TYPES] = {8, 8, 8};
-
 PACKL_File packl_init_file(char *filename, char *fullpath);
 void packl_compile_file(PACKL_Compiler *c, PACKL_File *self);
 
@@ -314,6 +312,12 @@ int packl_check_type_equality(PACKL_Type type1, PACKL_Type type2) {
         if(type1.as.basic != type2.as.basic) { return 0; }
         return 1;
     }
+
+    if (type1.kind == PACKL_TYPE_USER_DEFINED) {
+        if (!sv_eq(type1.as.user_defined, type2.as.user_defined)) { return 0; }
+        return 1;
+    }
+    
     return packl_check_type_equality(*type1.as.array.type, *type2.as.array.type);
 }
 
@@ -513,6 +517,35 @@ PACKL_Type packl_generate_string_index_code(PACKL_Compiler *c, PACKL_File *self,
     return int_type;
 }
 
+PACKL_Type packl_generate_field_expr_code(PACKL_Compiler *c, PACKL_File *self, Expr_Field expr, size_t indent) {
+    Variable var = packl_find_variable(self, expr.root, (Location){0,0});
+
+
+    if (var.type.kind != PACKL_TYPE_USER_DEFINED) {
+        PACKL_ERROR(self->filename, SV_FMT " is not an record", SV_UNWRAP(expr.root));
+    }
+
+    // SO FUCKING UPSET OF THIS SHITTY CODE 
+    Field field = packl_get_record_field(self, var.type.as.user_defined, expr.field);
+
+    if (field.type.kind != PACKL_TYPE_BASIC) {
+        PACKL_ERROR(self->filename, "can only deal with basic record types");
+    }
+
+    size_t offset = packl_get_record_field_offset(self, var.type.as.user_defined, expr.field);
+    size_t size = packl_get_type_size(self, field.type);    
+
+    PACKL_COMMENT(c->f, indent, "this is for the structure field");
+
+    packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
+    packl_generate_push(c, (int64_t)offset, indent);
+    packl_generate_add(c, indent);
+    packl_generate_push(c, (int64_t)size, indent);
+    packl_generate_load(c, indent);
+
+    return field.type;
+}
+
 PACKL_Type packl_generate_array_indexing_code(PACKL_Compiler *c, PACKL_File *self, Expr_Arr_Index arr_index, size_t indent) {
     Variable var = packl_find_variable(self, arr_index.name, (Location){0,0});
     
@@ -625,6 +658,8 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
             return packl_generate_preunary_expr_code(c, self, expr.as.unary, indent);
         case EXPR_KIND_POST_UNARY_OP:
             return packl_generate_postunary_expr_code(c, self, expr.as.unary, indent);
+        case EXPR_KIND_RECORD_FIELD:
+            return packl_generate_field_expr_code(c, self, expr.as.field, indent);
         case EXPR_KIND_NOT_INITIALIZED:
             packl_generate_push(c, 0, indent);
             return PACKL_TYPE_INTEGER;
@@ -680,7 +715,7 @@ void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_T
         // push the single item size
         packl_generate_array_item_size(c, self, *type.as.array.type, indent);
         // push the size of the array
-        packl_generate_expr_code(c, self, type.as.array.size, indent);
+        packl_generate_push(c, (int64_t)type.as.array.size, indent);
         // multiply them
         packl_generate_mul(c, indent);
         return;
@@ -692,8 +727,8 @@ void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_T
 void packl_generate_array_allocation_code(PACKL_Compiler *c, PACKL_File *self, Array_Type arr_type, size_t indent) {
     packl_generate_array_item_size(c, self, *arr_type.type, indent);
 
-    PACKL_Type size_type = packl_generate_expr_code(c, self, arr_type.size, indent);
-    packl_expect_type(self, arr_type.size.loc, PACKL_TYPE_INTEGER, size_type);
+    size_t size = arr_type.size;
+    packl_generate_push(c, (int64_t)size, indent);
 
     packl_generate_mul(c, indent);
     packl_generate_syscall(c, 2, indent); // the alloc syscall
@@ -764,6 +799,18 @@ void packl_handle_array_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declara
     }
 }
 
+void packl_handle_user_defined_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declaration var_dec, size_t indent) {
+    String_View type = var_dec.type.as.user_defined;
+    Record record = packl_find_record(self, type, (Location){0, 0});
+    
+    packl_generate_push(c, record.size, indent);
+    packl_generate_syscall(c, 2, indent);
+
+    if (var_dec.value.kind != EXPR_KIND_NOT_INITIALIZED) {
+        TODO("implement the structure initialization");
+    }
+}
+
 void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_dec_node, size_t indent) {
     Var_Declaration var_dec = var_dec_node.as.var_dec;
     packl_find_item_in_current_context_and_report_error_if_found(self, var_dec.name, var_dec_node.loc);
@@ -781,6 +828,10 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
 
     if (var_dec.type.kind == PACKL_TYPE_ARRAY) {
         return packl_handle_array_var_dec(c, self, var_dec, indent);
+    }
+
+    if (var_dec.type.kind == PACKL_TYPE_USER_DEFINED) {
+        return packl_handle_user_defined_var_dec(c, self, var_dec, indent);
     }
 
 
@@ -801,35 +852,59 @@ void packl_reassign_str_char_code(PACKL_Compiler *c, PACKL_File *self, Expressio
     packl_generate_storeb(c, indent);
 }
 
+void packl_reassign_record_field(PACKL_Compiler *c, PACKL_File *self, Variable var, Variable_Format fmt, Expression value, size_t indent) {
+    packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
+    
+    Field field = packl_get_record_field(self, var.type.as.user_defined, fmt.as.field);
+    size_t offset = packl_get_record_field_offset(self, var.type.as.user_defined, fmt.as.field);
+    
+    packl_generate_push(c, offset, indent);
+    packl_generate_add(c, indent);
+    
+    PACKL_Type expr_type = packl_generate_expr_code(c, self, value, indent);
+    if (!packl_check_type_equality(expr_type, field.type)) {
+        PACKL_ERROR(self->filename, "type mismatch");
+    }
+
+    size_t size = packl_get_type_size(self, expr_type);
+
+    packl_generate_push(c, size, indent);
+    packl_generate_store(c, indent);
+}
 
 void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node var_reassign_node, size_t indent) {
     Var_Reassign var_reassign = var_reassign_node.as.var;
-    Variable var = packl_find_variable(self, var_reassign.name, var_reassign_node.loc);
+    Variable_Format fmt = var_reassign.format;
 
+    Variable var = packl_find_variable(self, fmt.name, var_reassign_node.loc);
 
-    if (var_reassign.kind == PACKL_TYPE_ARRAY) {
+    if (fmt.kind == VARIABLE_FORMAT_ARRAY) {
         packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
 
         if (var.type.kind == PACKL_TYPE_BASIC && var.type.as.basic == PACKL_TYPE_STR) {
-            packl_reassign_str_char_code(c, self, var_reassign.expr, var_reassign.index, indent);
+            packl_reassign_str_char_code(c, self, var_reassign.value, fmt.as.index, indent);
         } else {
-            packl_reassign_array_item_code(c, self, var.type, var_reassign.expr, var_reassign.index, indent);
+            packl_reassign_array_item_code(c, self, var.type, var_reassign.value, fmt.as.index, indent);
         }
 
         return packl_generate_pop(c, indent);
     }
 
-
-    if (var_reassign.expr.kind == EXPR_KIND_POST_UNARY_OP) {
-        packl_generate_postunary_expr_code(c, self, var_reassign.expr.as.unary, indent);
-    } else {
-        PACKL_Type expr_type = packl_generate_expr_code(c, self, var_reassign.expr, indent);
-        PACKL_Type expected_type = var.type;
-        packl_expect_type(self, var_reassign.expr.loc, expected_type, expr_type);
-
-        size_t var_pos = c->stack_size - var.stack_pos - 1;
-        packl_generate_inswap(c, var_pos, indent);
+    if (fmt.kind == VARIABLE_FORMAT_RECORD) {
+        return packl_reassign_record_field(c, self, var, fmt, var_reassign.value, indent);
     }
+
+    if (var_reassign.value.kind == EXPR_KIND_POST_UNARY_OP) {
+        packl_generate_postunary_expr_code(c, self, var_reassign.value.as.unary, indent);   
+        packl_generate_pop(c, indent);
+    }
+
+    PACKL_Type expr_type = packl_generate_expr_code(c, self, var_reassign.value, indent);
+    PACKL_Type expected_type = var.type;
+    packl_expect_type(self, var_reassign.value.loc, expected_type, expr_type);
+
+    size_t var_pos = c->stack_size - var.stack_pos - 1;
+    packl_generate_inswap(c, var_pos, indent);
 
     packl_generate_pop(c, indent);
 }
@@ -1309,6 +1384,16 @@ void packl_generate_mod_call_node(PACKL_Compiler *c, PACKL_File *self, Node call
     PACKL_ERROR_LOC(self->filename, call_node.loc, "cannot access external module variables outside expression");
 }
 
+
+void packl_handle_record_definition(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
+    Record_Def record = node.as.record;
+    String_View record_name = record.name;
+    packl_find_item_and_report_error_if_found(self, record_name, node.loc);
+
+    Context_Item context_item = packl_init_record_context_item(self, record_name, record.fields);
+    packl_push_item_in_current_context(self, context_item);
+}
+
 void packl_generate_statement(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
     switch(node.kind) {
         case NODE_KIND_VAR_DECLARATION:
@@ -1342,6 +1427,8 @@ void packl_generate_global_statement(PACKL_Compiler *c, PACKL_File *self, Node n
             return packl_generate_proc_def_code(c, self, node, indent);
         case NODE_KIND_FUNC_DEF:
             return packl_generate_func_def_code(c, self, node, indent);
+        case NODE_KIND_RECORD:
+            return packl_handle_record_definition(c, self, node, indent);
         default:
             PACKL_ERROR_LOC(self->filename, node.loc, "unexpected token, consider starting a definition by a procedure, a function, a global variable declarations");
     }

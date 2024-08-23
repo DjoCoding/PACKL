@@ -10,7 +10,7 @@ char *symbols[] = {
     ")",
     "{",
     "}",
-
+    ".",
 };
 
 Token_Kind symbol_token_kinds[] = {
@@ -23,6 +23,7 @@ Token_Kind symbol_token_kinds[] = {
     TOKEN_KIND_CLOSE_PARENT,
     TOKEN_KIND_OPEN_CURLY_BRACE,
     TOKEN_KIND_CLOSE_CURLY_BRACE,
+    TOKEN_KIND_DOT,
 };
 
 char *keywords[] = {
@@ -43,6 +44,8 @@ char *keywords[] = {
     
     "use",
     "as",
+    
+    "record",
     
     "or",
     "and",
@@ -82,6 +85,8 @@ Token_Kind keyword_token_kinds[] = {
 
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
+
+    TOKEN_KIND_RECORD,
     
     TOKEN_KIND_OR,
     TOKEN_KIND_AND,
