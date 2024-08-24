@@ -6,14 +6,14 @@ a very small programming language built on top of the PACKL Virtual Machine, it 
 Once you have a PACKL program, follow the steps below to compile the program
 
 ```console 
-    ./bin/packlc <filepath> -code -out <output>.pasm
-    ./bin/pasm <output>.pasm
+./bin/packlc <filepath> -code -out <output>.pasm
+./bin/pasm <output>.pasm
 ```
 
 to run the program type the command below
 
 ```console 
-    ./bin/pvmr <output>.pvm
+./bin/pvmr <output>.pvm
 ```
 
 
@@ -158,18 +158,14 @@ record Point {
     y: int;
 };
 
-proc print_point(p: Point) {
-    write(0, "(", p.x, ", ", p.y, ")\n");
-}
-
 proc main() {
     var p: Point;
     p.x = 1;
     p.y = 2;
-    print_point(p);
-    exit(p.x - 1);
+    write(0, "(", p.x, ", ", p.y, ")\n");
+    exit(0);
 }
-`
+```
 
 
 # Note
