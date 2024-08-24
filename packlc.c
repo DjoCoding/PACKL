@@ -18,7 +18,14 @@ int args_end(Args *args) {
 }
 
 void usage(char *program) {
-    fprintf(stderr, "usage: %s <filepath> [flags]\n", program);
+    printf("usage: %s <filepath> [OPTIONS]\n", program);
+    printf("OPTIONS:\n");
+
+    printf("\thelp:     display the usage\n");
+    printf("\tlex:      lex the PACKL file and display the tokens\n");
+    printf("\tparse:    parse the PACKL file and display the AST\n");
+    printf("\tcode:     generate the PASM file\n");
+    printf("\tout:      specify the PASM output file name\n");
 }
 
 typedef enum {
@@ -66,7 +73,12 @@ int main(int argc, char **argv) {
 
 
     if (args_end(&args)) { usage(program); THROW_ERROR("no input file path provided"); }
-    input_filepath = args_shift(&args);
+    char *flag = args_shift(&args);
+
+    if(strcmp(flag, "-help") == 0) { usage(program); exit(0); }
+    else {
+        input_filepath = flag;
+    }
 
     handle_flags(&args, program, &output_filepath);
 

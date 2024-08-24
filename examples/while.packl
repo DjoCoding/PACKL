@@ -1,9 +1,8 @@
 proc main() {
 	var i: int = 10;
 
-	while(i) {
-		write(0, "Hello World\n", 12);	
-		i = i - 1;
+	while(i--) {
+		write(0, "Hello World\n");	
 	}
 	
 	exit(0);

@@ -1,6 +1,6 @@
 proc println(s: str) {
-	write(s);
-	write("\n");
+	write(0, s);
+	write(0, "\n");
 }
 
 proc main() {

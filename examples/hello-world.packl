@@ -1,4 +1,4 @@
 proc main() {
-    write("Hello World\n");
+    write(0, "Hello World\n");
     exit(0);
 }

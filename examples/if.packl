@@ -1,9 +1,9 @@
 proc foo() {
-    write(0, "foo\n", 4);
+    write(0, "foo\n");
 }
 
 proc bar() {
-    write(0, "bar\n", 4);
+    write(0, "bar\n");
 }
 
 proc main() {

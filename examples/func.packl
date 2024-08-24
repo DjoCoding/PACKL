@@ -1,16 +1,13 @@
 func strlen(s: str): int {
     var i: int = 0;
-    var current: int = 0;
-    var notstop: int = 1;
-    while(notstop) {
-        current = get_byte(s, i);
-        if (current) { i = i + 1; }
-        else { notstop = 0; }
+
+    while(s[i++]) {
     }
-    strlen = i;
+
+    strlen = i - 1;
 }
 
 proc main() {
-    var length: int = strlen("PACKL");
-    exit(length);
+    var s: str = "PACKL";
+    write(0, "the length of `", s, "` is: ", strlen(s), "\n");
 }
