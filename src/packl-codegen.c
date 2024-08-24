@@ -9,293 +9,26 @@ void packl_generate_func_call_node(PACKL_Compiler *c, PACKL_File *self, Node cal
 void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent);
 void packl_generate_statements(PACKL_Compiler *c, PACKL_File *self, AST nodes, size_t indent);
 
-size_t number_of_popped_values[] = {
-    2,       // write  
-    1,       // read: 2 for reading and 1 for push
-    0,       // alloc: 1 for the size and 1 for the push
-    1,       // free
-    1,       // open: 2 for the filepath and the mode and one of the file pointer (push) 
-    1,       // close 
-    1,       // exit
-};
-
 
 #define PACKL_TYPE_INTEGER    ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT })
 #define PACKL_TYPE_POINTER    ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_PTR })
 #define PACKL_TYPE_NONE       ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_VOID })
 #define PACKL_TYPE_STRING     ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_STR  })
 
-void fprintfln(FILE *f) {
-    fprintf(f, "\n");
-}
-
-void fprint_indent(FILE *f, size_t indent) {
-    for (size_t i = 0; i < indent; ++i) {
-        fprintf(f, "  ");
-    }
-}
-
-#define PACKL_COMMENT(f, indent, ...) { fprint_indent(f, indent); fprintf(f, "; " __VA_ARGS__); fprintf(f, "\n"); }
-
-void packl_generate_label(PACKL_Compiler *c, size_t label_value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "#label_%zu:\n", label_value);
-}
-
-void packl_generate_push(PACKL_Compiler *c, int64_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "push %ld\n", value);
-    c->stack_size++;    
-}
-
-void packl_generate_pushs(PACKL_Compiler *c, String_View value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "pushs \"" SV_FMT "\"\n", SV_UNWRAP(value));
-    c->stack_size++;    
-}
-
-void packl_generate_nop(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "nop\n");
-}
-
-void packl_generate_halt(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "halt\n");    
-}
-
-void packl_generate_pop(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "pop\n");
-    c->stack_size--;
-}
-
-void packl_generate_add(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "add\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_sub(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "sub\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_mul(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "mul\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_div(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "div\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_mod(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "mod\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_cmpl(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmpl\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_cmpg(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmpg\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_cmpge(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmpge\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_cmple(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmple\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_cmpe(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmpe\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_cmpne(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmpne\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_swap(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "swap\n");
-}
-
-void packl_generate_dup(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "dup\n");
-    c->stack_size++;
-}
-
-void packl_generate_inswap(PACKL_Compiler *c, int64_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "inswap %ld\n", value);
-}
-
-void packl_generate_indup(PACKL_Compiler *c, int64_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "indup %ld\n", value);
-    c->stack_size++;
-} 
-
-void packl_generate_syscall(PACKL_Compiler *c, int64_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "syscall %ld\n", value);
-    c->stack_size -= number_of_popped_values[value];
-}
-
-void packl_generate_writei(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "writei\n");
-    c->stack_size -= 2;
-}
-
-void packl_generate_jmp(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "jmp $label_%zu\n", value);
-}
-
-void packl_generate_cmp(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "cmp\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_jz(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "jz $label_%zu\n", value);
-    c->stack_size--;
-}
-
-
-void packl_generate_jle(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "jle $label_%zu\n", value);
-    c->stack_size--;
-}
-
-
-void packl_generate_jl(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "jl $label_%zu\n", value);
-    c->stack_size--;
-}
-
-
-void packl_generate_jge(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "jge $label_%zu\n", value);
-    c->stack_size--;
-}
-
-
-void packl_generate_jg(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "jg $label_%zu\n", value);
-    c->stack_size--;
-}
-
-void packl_generate_putc(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "putc\n");
-    c->stack_size--; // TODO: see if you can change this line, i think it's not correct
-}
-
-void packl_generate_call(PACKL_Compiler *c, size_t value, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "call $label_%zu\n", value);
-}
-
-void packl_generate_ret(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "ret\n");
-}
-
-void packl_generate_store(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "store\n");
-    c->stack_size -= 3;
-}
-
-void packl_generate_load(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "load\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_readc(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "readc\n");
-    c->stack_size++;
-}
-
-void packl_generate_loadb(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "loadb\n");
-}
-
-void packl_generate_storeb(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "strb\n");
-    c->stack_size -= 2;
-}
-
-void packl_generate_ssp(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "ssp\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_not(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "not\n");
-}
-
-void packl_generate_and(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "and\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_or(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "or\n");
-    c->stack_size -= 1;
-}
-
-void packl_generate_xor(PACKL_Compiler *c, size_t indent) {
-    fprint_indent(c->f, indent);
-    fprintf(c->f, "xor\n");
-    c->stack_size -= 1;
-}
 
 void packl_check_if_type_and_operator_fits_together(PACKL_File *self, PACKL_Type type, Operator op) {
     if(type.kind == PACKL_TYPE_ARRAY) {
         PACKL_ERROR(self->filename, "no arithmetic or logic operators used with arrays");
     }
+    
+    if (type.kind == PACKL_TYPE_USER_DEFINED) {
+        PACKL_ERROR(self->filename, "no arithmetic or logic operators used with records");
+    }
+
     if (type.as.basic == PACKL_TYPE_STR) {
         PACKL_ERROR(self->filename, "no arithmetic or logic operators used with strings");
     }
+    
     if (type.as.basic == PACKL_TYPE_VOID) {
         PACKL_ERROR(self->filename, "no arithmetic or logic operators used with void typed data");
     }
@@ -318,7 +51,7 @@ int packl_check_type_equality(PACKL_Type type1, PACKL_Type type2) {
         return 1;
     }
     
-    return packl_check_type_equality(*type1.as.array.type, *type2.as.array.type);
+    return packl_check_type_equality(*type1.as.array.item_type, *type2.as.array.item_type);
 }
 
 PACKL_Type packl_type_check(PACKL_File *self, PACKL_Type lhs_type, PACKL_Type rhs_type, Operator op) {
@@ -369,9 +102,11 @@ void packl_print_expr_type(PACKL_Type type) {
             default:
                 ASSERT(false, "unreachable");
         }
+    } else if (type.kind == PACKL_TYPE_USER_DEFINED) {
+        fprintf(stderr, SV_FMT"\n", SV_UNWRAP(type.as.user_defined));
     } else {
         fprintf(stderr, "array of ");
-        packl_print_expr_type(*type.as.array.type);
+        packl_print_expr_type(*type.as.array.item_type);
     }
 } 
 
@@ -560,7 +295,7 @@ PACKL_Type packl_generate_array_indexing_code(PACKL_Compiler *c, PACKL_File *sel
     PACKL_COMMENT(c->f, indent, "this is for the array indexing");
 
     // push the item size
-    packl_generate_array_item_size(c, self, *var.type.as.array.type, indent);
+    packl_generate_array_item_size(c, self, *var.type.as.array.item_type, indent);
 
     // push the array
     packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
@@ -581,7 +316,7 @@ PACKL_Type packl_generate_array_indexing_code(PACKL_Compiler *c, PACKL_File *sel
 
     packl_generate_load(c, indent);
 
-    return *var.type.as.array.type;
+    return *var.type.as.array.item_type;
 }
 
 PACKL_Type packl_generate_not_unary_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression expr, size_t indent) {
@@ -636,6 +371,30 @@ PACKL_Type packl_generate_preunary_expr_code(PACKL_Compiler *c, PACKL_File *self
     ASSERT(false, "unreachable");
 }
 
+void packl_generate_sizeof_code(PACKL_Compiler *c, PACKL_File *self, Expr_Operator_Input input, size_t indent) {
+    size_t size = packl_get_operator_input_size(c, self, input);
+    packl_generate_push(c, (int64_t)size, indent);
+}
+
+void packl_generate_new_code(PACKL_Compiler *c, PACKL_File *self, Expr_Operator_Input input, size_t indent) {
+    packl_generate_sizeof_code(c, self, input, indent);
+    packl_generate_syscall(c, 2, indent);
+}
+
+
+PACKL_Type packl_generate_operator_expr_code(PACKL_Compiler *c, PACKL_File *self, Expr_Operator operator, size_t indent) {
+    switch(operator.op) {
+        case SIZEOF_OPERATOR:
+            packl_generate_sizeof_code(c, self, operator.input, indent);
+            return PACKL_TYPE_INTEGER;
+        case NEW_OPERATOR:
+            packl_generate_new_code(c, self, operator.input, indent);
+            return PACKL_TYPE_POINTER;
+        default:
+            ASSERT(false, "`packl_generate_operator_expr_code` failed to generate the new operator code");
+    }
+}
+
 PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Expression expr, size_t indent) {
     switch(expr.kind) {
         case EXPR_KIND_INTEGER:
@@ -660,9 +419,8 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
             return packl_generate_postunary_expr_code(c, self, expr.as.unary, indent);
         case EXPR_KIND_RECORD_FIELD:
             return packl_generate_field_expr_code(c, self, expr.as.field, indent);
-        case EXPR_KIND_NOT_INITIALIZED:
-            packl_generate_push(c, 0, indent);
-            return PACKL_TYPE_INTEGER;
+        case EXPR_KIND_OPERATOR:    
+            return packl_generate_operator_expr_code(c, self, expr.as.operator, indent);
         default:
             ASSERT(false, "unreachable");
     }
@@ -705,88 +463,27 @@ void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc
     packl_generate_ret(c, indent + 1);
 }
 
-void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_Type type, size_t indent) {
-    if(type.kind == PACKL_TYPE_BASIC) {
-        packl_generate_push(c, data_type_size[type.as.basic], indent);
-        return;
-    }
-
-    if (type.kind == PACKL_TYPE_ARRAY) {
-        // push the single item size
-        packl_generate_array_item_size(c, self, *type.as.array.type, indent);
-        // push the size of the array
-        packl_generate_push(c, (int64_t)type.as.array.size, indent);
-        // multiply them
-        packl_generate_mul(c, indent);
-        return;
-    }
-
-    ASSERT(false, "unreachable");
-}
-
-void packl_generate_array_allocation_code(PACKL_Compiler *c, PACKL_File *self, Array_Type arr_type, size_t indent) {
-    packl_generate_array_item_size(c, self, *arr_type.type, indent);
-
-    size_t size = arr_type.size;
-    packl_generate_push(c, (int64_t)size, indent);
-
-    packl_generate_mul(c, indent);
-    packl_generate_syscall(c, 2, indent); // the alloc syscall
-}
 
 void packl_reassign_array_item_code(PACKL_Compiler *c, PACKL_File *self, PACKL_Type arr_type, Expression value, Expression index, size_t indent) {   
-    // example: arr[2] = 1; arr is a array of integers
-    // stack: arr
-
-    // duplicate the array pointer
     packl_generate_dup(c, indent);
-    // stack: arr arr
-
-    // generate the push of the data type size
-    packl_generate_array_item_size(c, self, *arr_type.as.array.type, indent);
-    // stack: arr arr sizeof(int)
-
+    packl_generate_array_item_size(c, self, *arr_type.as.array.item_type, indent);
     packl_generate_swap(c, indent);
-    // stack: arr sizeof(int) arr
-
-    // duplicate the array item size because we need it 
     packl_generate_indup(c, 1, indent);
-    // stack: arr sizeof(int) arr sizeof(int)
-
-    // generate the index
-    PACKL_Type index_type = packl_generate_expr_code(c, self, index, indent);
-    packl_expect_type(self, index.loc, PACKL_TYPE_INTEGER, index_type);
-    // stack: arr sizeof(int) arr sizeof(int) 2
-
-    // multiply the index with the item_size 
+    packl_expect_type(self, index.loc, packl_generate_expr_code(c, self, index, indent), PACKL_TYPE_INTEGER);
     packl_generate_mul(c, indent);
-    // stack: arr sizeof(int) arr (2*sizeof(int))
-
-    // add the offset to the array pointer 
     packl_generate_add(c, indent);
-    // stack: arr sizeof(int) (arr + 2 * sizeof(int))
-
-    // generate a swap
     packl_generate_swap(c, indent);
-    // stack: arr (arr + 2 * sizeof(int)) sizeof(int)
 
-    // push the data 
-    PACKL_Type value_type = packl_generate_expr_code(c, self, value, indent);
-    PACKL_Type expected_type = *arr_type.as.array.type;
-    packl_expect_type(self, value.loc, expected_type, value_type);
-    // stack: arr (arr + 2 * sizeof(int)) sizeof(int) 1
+    PACKL_Type expected_type = *arr_type.as.array.item_type;
+    packl_expect_type(self, value.loc, expected_type, packl_generate_expr_code(c, self, value, indent));
 
-    // generate another swap
     packl_generate_swap(c, indent);
-    // stack: arr (arr + 2 * sizeof(int)) 1 sizeof(int)
-
-    // ready for the storing
     packl_generate_store(c, indent);
-    // stack: arr 
 }
 
 void packl_handle_array_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declaration var_dec, size_t indent) {
     PACKL_Type arr_type = var_dec.type;
+
     // allocate the memory for the array
     packl_generate_array_allocation_code(c, self, arr_type.as.array, indent);
 
@@ -801,10 +498,13 @@ void packl_handle_array_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declara
 
 void packl_handle_user_defined_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declaration var_dec, size_t indent) {
     String_View type = var_dec.type.as.user_defined;
+    
+    // check if the given type is a record or no
     Record record = packl_find_record(self, type, (Location){0, 0});
     
     packl_generate_push(c, record.size, indent);
     packl_generate_syscall(c, 2, indent);
+    
 
     if (var_dec.value.kind != EXPR_KIND_NOT_INITIALIZED) {
         TODO("implement the structure initialization");
@@ -819,10 +519,15 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
     packl_push_item_in_current_context(self, new_var);
     
     if (var_dec.type.kind == PACKL_TYPE_BASIC) {
-        PACKL_Type expr_type = packl_generate_expr_code(c, self, var_dec.value, indent);
-        if (!packl_check_type_equality(expr_type, var_dec.type)) {
+        if (var_dec.value.kind == EXPR_KIND_NOT_INITIALIZED) { 
+            c->stack_size++;
+            return;
+        }
+
+        if (!packl_check_type_equality(packl_generate_expr_code(c, self, var_dec.value, indent), var_dec.type)) {
             PACKL_ERROR_LOC(self->filename, var_dec_node.loc, "type mismatch");
         }
+        
         return;
     }
 
@@ -833,7 +538,6 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
     if (var_dec.type.kind == PACKL_TYPE_USER_DEFINED) {
         return packl_handle_user_defined_var_dec(c, self, var_dec, indent);
     }
-
 
     ASSERT(false, "unreachable");
 }
@@ -883,8 +587,10 @@ void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node 
 
         if (var.type.kind == PACKL_TYPE_BASIC && var.type.as.basic == PACKL_TYPE_STR) {
             packl_reassign_str_char_code(c, self, var_reassign.value, fmt.as.index, indent);
-        } else {
+        } else if (var.type.kind == PACKL_TYPE_ARRAY){
             packl_reassign_array_item_code(c, self, var.type, var_reassign.value, fmt.as.index, indent);
+        } else {
+            PACKL_ERROR_LOC(self->filename, var_reassign_node.loc, "`" SV_FMT "` is not an array nor a str", SV_UNWRAP(var_reassign.format.name));
         }
 
         return packl_generate_pop(c, indent);
@@ -899,9 +605,8 @@ void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node 
         packl_generate_pop(c, indent);
     }
 
-    PACKL_Type expr_type = packl_generate_expr_code(c, self, var_reassign.value, indent);
     PACKL_Type expected_type = var.type;
-    packl_expect_type(self, var_reassign.value.loc, expected_type, expr_type);
+    packl_expect_type(self, var_reassign.value.loc, expected_type, packl_generate_expr_code(c, self, var_reassign.value, indent));
 
     size_t var_pos = c->stack_size - var.stack_pos - 1;
     packl_generate_inswap(c, var_pos, indent);
@@ -1096,21 +801,6 @@ void packl_generate_native_mdealloc_code(PACKL_Compiler *c, PACKL_File *self, No
     packl_generate_syscall(c, 3, indent);
 }
 
-void packl_generate_native_sizeof_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
-    Func_Call native_sizeof = caller.as.func_call;
-
-    packl_check_caller_arity(self, caller, 1);
-
-    Expression arg = native_sizeof.args.items[0].expr;
-
-    if (arg.kind != EXPR_KIND_ID) {
-        PACKL_ERROR_LOC(self->filename, caller.loc, "`sizeof` function can be called only on variables");
-    }
-
-    Variable var = packl_find_variable(self, arg.as.value, caller.loc);
-
-    packl_generate_push(c, data_type_size[var.type.as.basic], indent);
-}
 
 void packl_generate_native_mload_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
     Func_Call native_mload = caller.as.func_call;
@@ -1175,10 +865,6 @@ void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node n
 
     if (sv_eq(native.name, SV("mset"))) {
         return packl_generate_native_mset_code(c, self, node, indent);
-    }
-
-    if (sv_eq(native.name, SV("sizeof"))) {
-        return packl_generate_native_sizeof_code(c, self, node, indent);
     }
 
     ASSERT(false, "unreachable");

@@ -4,6 +4,7 @@
 #include "packl-defs.h"
 
 extern size_t data_type_size[COUNT_PACKL_TYPES];
+extern char *context_item_as_cstr[COUNT_CONTEXT_ITEM_TYPES];
 
 void packl_init_contexts(PACKL_File *self);
 void packl_push_new_context(PACKL_File *self);

@@ -4,6 +4,8 @@
 #include "packl-defs.h"
 
 
+extern char *builtin_operators[];
+
 #define lpeek    packl_lexer_peek
 #define ladv     packl_lexer_advance
 #define leof     packl_lexer_eof 

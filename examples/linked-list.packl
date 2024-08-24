@@ -1,0 +1,109 @@
+record Node {
+    value: int;
+    next: ptr;
+};
+
+record List {
+    head: ptr;
+    tail: ptr;
+};
+
+func node_get_value(node: ptr): int {
+    node_get_value = mload(node, sizeof int);
+}
+
+func node_get_next(node: ptr): ptr {
+    node_get_next = mload(node + sizeof int, sizeof ptr);
+}
+
+proc node_set_value(node: ptr, value: int) {
+    mset(node, value, sizeof int);
+}
+
+proc node_set_next(node: ptr, next: ptr) {
+    mset(node + sizeof int, next, sizeof ptr);
+}
+
+func node_init(value: int): ptr {
+    var node: ptr = new Node;
+    node_set_value(node, value);
+    node_set_next(node, 0);
+    node_init = node;
+}
+
+proc node_write(node: ptr) {
+    write(0, node_get_value(node));
+}
+
+
+func list_get_head(list: ptr): ptr {
+    list_get_head = mload(list, sizeof ptr);
+}
+
+func list_get_tail(list: ptr): ptr {
+    list_get_tail = mload(list + sizeof ptr, sizeof ptr);
+}
+
+proc list_set_head(list: ptr, head: ptr) {
+    mset(list, head, sizeof ptr);
+}
+
+proc list_set_tail(list: ptr, tail: ptr) {
+    mset(list + sizeof ptr, tail, sizeof ptr);
+}
+
+func list_init(): ptr {
+    var list: ptr = new List;
+    list_set_head(list, 0);
+    list_set_tail(list, 0);
+    list_init = list;
+}
+
+proc list_reset(list: ptr) {
+    list_set_head(list, 0);
+    list_set_tail(list, 0);
+}
+
+proc list_print(list: ptr) {
+    var current: ptr = list_get_head(list);
+    while(current) {
+        node_write(current);
+        write(0, " ");
+        current = node_get_next(current);
+    }
+    write(0, "\n");
+}
+
+proc free_list(list: ptr) {
+    var current: ptr = list_get_head(list);
+    var next: ptr = 0;
+    while(current) {
+        next = node_get_next(current);
+        mdealloc(current);
+        current = next;
+    }
+    list_reset(list);
+}
+
+proc list_append(list: ptr, value: int) {
+    var node: ptr = node_init(value);
+    var head: ptr = list_get_head(list);
+    var tail: ptr = list_get_tail(list);
+
+    if (!head) { list_set_head(list, node); list_set_tail(list, node); }
+    else {
+        node_set_next(tail, node);
+        list_set_tail(list, node);
+    }
+}
+
+
+proc main() {
+    var list: ptr = list_init();
+    for i: int in (0, 10) {
+        list_append(list, i);
+    }
+    list_print(list);
+    free_list(list);
+    exit(0);
+}

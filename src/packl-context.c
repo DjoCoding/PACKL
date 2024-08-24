@@ -2,7 +2,7 @@
 
 size_t data_type_size[COUNT_PACKL_TYPES] = {8, 8, 8};
 
-char *context_item_as_cstr[] = {
+char *context_item_as_cstr[COUNT_CONTEXT_ITEM_TYPES] = {
     "procedure",
     "variable",
     "function",
@@ -87,12 +87,11 @@ Variable packl_init_context_variable(PACKL_Type type, size_t pos) {
     return var;
 }
 
-
 size_t packl_get_array_size(PACKL_File *self, Array_Type arr_type) {
     size_t size = arr_type.size;
     size_t item_size = 0;
 
-    PACKL_Type item_type = *arr_type.type;
+    PACKL_Type item_type = *arr_type.item_type;
 
     switch(item_type.kind) {
         case PACKL_TYPE_ARRAY:

@@ -37,8 +37,8 @@ void packl_destroy_func_call(Func_Call call);
 void packl_destroy_type(PACKL_Type type) {
     if(type.kind == PACKL_TYPE_BASIC) { return; }
     if(type.kind == PACKL_TYPE_ARRAY) {
-        packl_destroy_type(*type.as.array.type);
-        free(type.as.array.type);
+        packl_destroy_type(*type.as.array.item_type);
+        free(type.as.array.item_type);
         return;
     }
     if (type.kind == PACKL_TYPE_USER_DEFINED) { return; }
@@ -47,6 +47,11 @@ void packl_destroy_type(PACKL_Type type) {
 
 void packl_destroy_expr(Expression expr) {
     switch(expr.kind) {
+        case EXPR_KIND_OPERATOR:
+            if (expr.as.operator.input.kind == INPUT_KIND_TYPE) {
+                packl_destroy_type(expr.as.operator.input.as.type);
+            }
+            break;
         case EXPR_KIND_BIN_OP:
             packl_destroy_expr(*expr.as.bin.lhs);
             packl_destroy_expr(*expr.as.bin.rhs);

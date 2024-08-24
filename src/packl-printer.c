@@ -10,6 +10,7 @@ char *token_kinds[] = {
     ";",
     ":",
     ",",
+    ".",
 
     "[",
     "]",
@@ -65,7 +66,14 @@ char *token_kinds[] = {
     "type-str",
     "type-ptr",
 
+    "operator",
+
     "end",
+};
+
+char *operator_input_kind[] = {
+    "type",
+    "identifier",
 };
 
 void packl_print_expr(Expression expr, size_t indent);
@@ -178,7 +186,7 @@ void packl_print_type(PACKL_Type type, size_t indent);
 void packl_print_array_type(Array_Type type, size_t indent) {
     print_indent(indent);
     printf("type: array\n");
-    packl_print_type(*type.type, indent + 1);
+    packl_print_type(*type.item_type, indent + 1);
     print_indent(indent);
     printf("size: %zu\n", (size_t)type.size);
 }
@@ -268,8 +276,25 @@ void packl_print_postunary_expr(Expr_Unary_Op unary, size_t indent) {
     }
 }
 
+void packl_print_operator_expr(Expr_Operator operator, size_t indent) {
+    print_indent(indent);
+    printf("operator: %s\n", builtin_operators[operator.op]);
+
+    print_indent(indent + 1);
+    printf("input-type: `%s`\n", operator_input_kind[operator.input.kind]);
+
+    if (operator.input.kind == INPUT_KIND_TYPE) {
+        packl_print_type(operator.input.as.type, indent + 1);
+    } else {
+        print_indent(indent + 1);
+        printf("value: `" SV_FMT "`\n", SV_UNWRAP(operator.input.as.identifier));
+    }
+}
+
 void packl_print_expr(Expression expr, size_t indent) {
     switch(expr.kind) {
+        case EXPR_KIND_OPERATOR:
+            return packl_print_operator_expr(expr.as.operator, indent);
         case EXPR_KIND_STRING:
             return packl_print_string_expr(expr.as.value, indent);
         case EXPR_KIND_INTEGER:

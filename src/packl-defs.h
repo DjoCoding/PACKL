@@ -51,6 +51,12 @@ typedef struct Proc_Def Proc_Def;
 typedef struct Use Use;
 
 // expression
+typedef enum Expr_Operator_Kind Expr_Operator_Kind;
+typedef enum Expr_Operator_Input_Kind Expr_Operator_Input_Kind;
+typedef union Expr_Operator_Input_As Expr_Operator_Input_As;
+typedef struct Expr_Operator_Input Expr_Operator_Input;
+typedef struct Expr_Operator Expr_Operator;
+typedef struct Expr_SizeOf Expr_SizeOf;
 typedef struct Expr_Field Expr_Field;
 typedef enum Operator Operator;
 typedef struct Expr_Unary_Op Expr_Unary_Op;
@@ -181,7 +187,9 @@ enum Token_Kind {
     TOKEN_KIND_INT_TYPE,
     TOKEN_KIND_STR_TYPE,
     TOKEN_KIND_PTR_TYPE,
-    
+
+    TOKEN_KIND_OPERATOR,
+
     TOKEN_KIND_END,
 
     COUNT_TOKEN_KINDS,
@@ -223,16 +231,35 @@ enum Node_Kind {
 };
 
 
-struct Expr_Arr {
-    Expression *items;
-    size_t count;
+enum Type {
+    PACKL_TYPE_INT = 0,
+    PACKL_TYPE_STR,
+    PACKL_TYPE_PTR,
+    PACKL_TYPE_VOID,
+    COUNT_PACKL_TYPES,
+};
+
+struct Array_Type {
+    PACKL_Type *item_type;
     size_t size;
 };
 
-struct Expr_Arr_Index {
-    String_View name;
-    Expression *index;
+enum PACKL_Type_Kind {
+    PACKL_TYPE_BASIC,
+    PACKL_TYPE_ARRAY,
+    PACKL_TYPE_USER_DEFINED,
 };
+
+union PACKL_Type_As {
+    Type basic;
+    Array_Type array;
+    String_View user_defined;
+};
+
+struct PACKL_Type {
+    PACKL_Type_Kind kind;
+    PACKL_Type_As as;
+};  
 
 enum Expr_Kind {
     EXPR_KIND_BIN_OP = 0,
@@ -248,6 +275,7 @@ enum Expr_Kind {
     EXPR_KIND_ARRAY_INDEXING,
     EXPR_KIND_RECORD_FIELD,
     EXPR_KIND_NOT_INITIALIZED,
+    EXPR_KIND_OPERATOR,
 };
 
 enum Operator {
@@ -270,6 +298,17 @@ enum Operator {
     OP_NE,
 };  
 
+struct Expr_Arr {
+    Expression *items;
+    size_t count;
+    size_t size;
+};
+
+struct Expr_Arr_Index {
+    String_View name;
+    Expression *index;
+};
+
 struct Expr_Bin_Op {
     Expression *lhs, *rhs;
     Operator op;
@@ -285,6 +324,31 @@ struct Expr_Field {
     String_View field;
 };
 
+enum Expr_Operator_Input_Kind {
+    INPUT_KIND_TYPE = 0,
+    INPUT_KIND_ID,
+};
+
+union Expr_Operator_Input_As {
+    PACKL_Type type;
+    String_View identifier;
+};
+
+enum Expr_Operator_Kind {
+    NEW_OPERATOR = 0,
+    SIZEOF_OPERATOR,
+};
+
+struct Expr_Operator_Input {
+    Expr_Operator_Input_Kind kind;
+    Expr_Operator_Input_As as;
+};
+
+struct Expr_Operator {
+    Expr_Operator_Kind op;
+    Expr_Operator_Input input;
+};
+
 union Expr_As {
     Expr_Bin_Op bin;
     Expr_Unary_Op unary;
@@ -295,42 +359,13 @@ union Expr_As {
     Expr_Arr arr;
     Expr_Arr_Index arr_index;
     Expr_Field field;
+    Expr_Operator operator;
 };
 
 struct Expression {
     Expr_Kind kind;
     Expr_As as;
     Location loc;
-};  
-
-enum Type {
-    PACKL_TYPE_INT = 0,
-    PACKL_TYPE_STR,
-    PACKL_TYPE_PTR,
-    PACKL_TYPE_VOID,
-    COUNT_PACKL_TYPES,
-};
-
-struct Array_Type {
-    PACKL_Type *type;
-    size_t size;
-};
-
-enum PACKL_Type_Kind {
-    PACKL_TYPE_BASIC,
-    PACKL_TYPE_ARRAY,
-    PACKL_TYPE_USER_DEFINED,
-};
-
-union PACKL_Type_As {
-    Type basic;
-    Array_Type array;
-    String_View user_defined;
-};
-
-struct PACKL_Type {
-    PACKL_Type_Kind kind;
-    PACKL_Type_As as;
 };  
 
 struct PACKL_Arg {
@@ -509,6 +544,7 @@ enum Context_Item_Type {
     CONTEXT_ITEM_TYPE_FUNCTION,
     CONTEXT_ITEM_TYPE_MODULE,
     CONTEXT_ITEM_TYPE_RECORD,
+    COUNT_CONTEXT_ITEM_TYPES,
 };
 
 union Context_Item_As {

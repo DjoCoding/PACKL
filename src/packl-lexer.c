@@ -64,7 +64,6 @@ char *natives[] = {
     "mdealloc",
     "mload",
     "mset",
-    "sizeof",
 };
 
 Token_Kind keyword_token_kinds[] = {
@@ -96,6 +95,11 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_INT_TYPE,
     TOKEN_KIND_STR_TYPE,
     TOKEN_KIND_PTR_TYPE,
+};
+
+char *builtin_operators[] = {
+    "new",
+    "sizeof",
 };
 
 char packl_lexer_peek(PACKL_File *self) {
@@ -158,6 +162,15 @@ Token packl_lexer_lex_id(PACKL_File *self) {
     }
 
     String_View id = SV_GET(begin, size);
+
+    // check for builtin operators (sizeof), (new)
+    for(size_t i = 0; i < ARR_SIZE(builtin_operators); ++i) {
+        if (sv_eq(id, SV(builtin_operators[i]))) {
+            token.text = SV_GET(begin, size);
+            token.kind = TOKEN_KIND_OPERATOR;
+            return token;
+        }
+    }
 
     // check for the natives
     for (size_t i = 0; i < ARR_SIZE(natives); ++i) {

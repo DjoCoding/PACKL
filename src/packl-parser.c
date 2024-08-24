@@ -299,8 +299,8 @@ Array_Type packl_parser_parse_array_type(PACKL_File *self) {
     
     pexp(self, TOKEN_KIND_OPEN_PARENT, NULL);
 
-    arr_type.type = malloc(sizeof(PACKL_Type));
-    *arr_type.type = packl_parser_parse_type(self);
+    arr_type.item_type = malloc(sizeof(PACKL_Type));
+    *arr_type.item_type = packl_parser_parse_type(self);
     
     pexp(self, TOKEN_KIND_COMMA, NULL);
     
@@ -395,6 +395,12 @@ Var_Declaration packl_parser_parse_var_dec(PACKL_File *self) {
     }
 
     pexp(self, TOKEN_KIND_EQUAL, NULL);
+
+    if(ppeek(self).kind == TOKEN_KIND_SEMI_COLON) {
+        
+    }
+
+    if (var_dec.type.kind == PACKL_TYPE_ARRAY) {}
 
     if(ppeek(self).kind == TOKEN_KIND_OPEN_CURLY_BRACE) {
         padv(self);
@@ -581,6 +587,36 @@ Expr_Field packl_parser_parse_field(PACKL_File *self) {
     return expr;
 }
 
+Expr_Operator packl_parser_parse_builtin_operator(PACKL_File *self) {
+    Expr_Operator expr = {0};
+
+    Token token = {0};
+    pexp(self, TOKEN_KIND_OPERATOR, &token);
+
+    if (sv_eq(token.text, SV("sizeof"))) {
+        expr.op = SIZEOF_OPERATOR;
+    } else if (sv_eq(token.text, SV("new"))) {
+        expr.op = NEW_OPERATOR;
+    } else {
+        ASSERT(false, "`packl_parser_parse_builtin_operator` failed to parse the operator added");
+    }    
+
+    token = ppeek(self);
+    switch(token.kind) {
+        case TOKEN_KIND_IDENTIFIER:
+            expr.input.kind = INPUT_KIND_ID;
+            expr.input.as.identifier = token.text;
+            padv(self);
+            break;
+        default:
+            expr.input.kind = INPUT_KIND_TYPE;
+            expr.input.as.type = packl_parser_parse_type(self);
+            break;    
+    }
+
+    return expr;
+}
+
 Expression packl_parser_parse_primary_expr(PACKL_File *self) {
     if (peot(self)) { PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "expected more tokens for the expression evaluation but end found"); }
 
@@ -668,6 +704,12 @@ Expression packl_parser_parse_primary_expr(PACKL_File *self) {
         }
 
         PACKL_ERROR_LOC(self->filename, token.loc, "expected `(` after the native `" SV_FMT "`", SV_UNWRAP(token.text));
+    }
+
+    if(token.kind == TOKEN_KIND_OPERATOR) {
+        expr.kind = EXPR_KIND_OPERATOR;
+        expr.as.operator = packl_parser_parse_builtin_operator(self);
+        return expr;
     }
 
     PACKL_ERROR_LOC(self->filename, ppeek(self).loc, "unexpected token found when parsing expression `" SV_FMT "`", SV_UNWRAP(token.text));
