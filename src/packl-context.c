@@ -13,6 +13,10 @@ Context packl_get_current_context(PACKL_File *self) {
     return self->contexts.items[self->contexts.count - 1];
 }
 
+int packl_on_global_context(PACKL_File *self) {
+    return self->contexts.count == 1;
+}
+
 void packl_destroy_context(Context context) {
     for (size_t i = 0; i < context.count; ++i) {
         Context_Item item = context.items[i];
@@ -276,3 +280,20 @@ Field packl_get_record_field(PACKL_File *self, String_View rec_name, String_View
 
     PACKL_ERROR(self->filename, "no field `" SV_FMT "` for the record `" SV_FMT "`", SV_UNWRAP(field_name), SV_UNWRAP(rec_name));
 }
+
+// this is used for the finding the function to execute recursion
+Function *packl_find_function_in_previous_scopes(PACKL_File *self, String_View name) {
+    if (packl_on_global_context(self)) { return NULL; }
+    
+    for (size_t i = self->contexts.count - 1; i != 0; --i) {
+        Context context = self->contexts.items[i - 1];
+        Context_Item *item = packl_get_context_item_in_context(context, name);
+        if (!item) { continue; }        
+        if (item->type == CONTEXT_ITEM_TYPE_FUNCTION) {
+            return &item->as.func;
+        }
+    }
+    
+    return NULL;
+}
+

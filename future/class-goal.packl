@@ -1,0 +1,26 @@
+class Node {
+    value: int;
+    next: Node;
+}
+
+# here you gonna push two things, the object refered by 'this' and the value
+# init is the constructor for any class object
+proc Node.init(value: int) {
+    this.value = value;
+    this.next = 0;
+}
+
+func Node.value(): int {
+    value = this.value;
+}
+
+func Node.next(): Node {
+    next = this.next;
+}
+
+proc main() {
+    var head: Node;
+    head.init(10);
+    var value: int = head.value();
+    exit(value);
+}

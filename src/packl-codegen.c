@@ -130,12 +130,34 @@ PACKL_Type packl_generate_identifier_expr_code(PACKL_Compiler *c, PACKL_File *se
 }
 
 PACKL_Type packl_generate_func_call_expr_code(PACKL_Compiler *c, PACKL_File *self, Func_Call func, size_t indent) {
-    Context_Item *item = packl_find_function_or_procedure(self, func.name, (Location) { 0, 0 });
-    if (item->type != CONTEXT_ITEM_TYPE_FUNCTION) { 
-        PACKL_ERROR(self->filename, "procedure call returns void in an expression");
+    Context_Item *item = packl_get_context_item_in_all_contexts(self, func.name);
+    if (!item) {
+        PACKL_ERROR(self->filename, "`" SV_FMT "` called but never declared", SV_UNWRAP(func.name));
     }
 
-    Function function = item->as.func;
+    Function function = {0};
+    Function *isfound = NULL;
+    
+
+    if (item->type == CONTEXT_ITEM_TYPE_VARIABLE) { 
+        // maybe it's a recursive call
+        isfound = packl_find_function_in_previous_scopes(self, func.name);
+        if (!isfound) {
+            PACKL_ERROR(self->filename, "`" SV_FMT "` expected to be a function, but found as a variable", SV_UNWRAP(func.name));
+        }
+        function = *isfound;
+    } else if (item->type != CONTEXT_ITEM_TYPE_FUNCTION) {
+        if (item->type == CONTEXT_ITEM_TYPE_PROCEDURE) {
+            PACKL_ERROR(self->filename, "`" SV_FMT "` found as procedure, procedures return void in an expression", SV_UNWRAP(func.name));
+        }
+
+        PACKL_ERROR(self->filename, "`" SV_FMT "` expected to be a function, but found as a %s", SV_UNWRAP(func.name), context_item_as_cstr[item->type]);
+    }
+
+    if (item->type == CONTEXT_ITEM_TYPE_FUNCTION) {
+        function = item->as.func;
+    }
+
     Node caller = { .as.func_call = func, .kind = NODE_KIND_FUNC_CALL };
     packl_generate_func_call_node(c, self, caller, function, indent);
 

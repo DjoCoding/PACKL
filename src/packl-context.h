@@ -7,14 +7,16 @@ extern size_t data_type_size[COUNT_PACKL_TYPES];
 extern char *context_item_as_cstr[COUNT_CONTEXT_ITEM_TYPES];
 
 void packl_init_contexts(PACKL_File *self);
+void packl_remove_contexts(PACKL_File *self);
+
 void packl_push_new_context(PACKL_File *self);
+void packl_pop_context(PACKL_File *self);
+
 Context packl_get_current_context(PACKL_File *self);
 Context_Item *packl_get_context_item_in_current_context(PACKL_File *self, String_View id);
 Context_Item *packl_get_context_item_in_all_contexts(PACKL_File *self, String_View id);
 void packl_push_item_in_current_context(PACKL_File *self, Context_Item item);
 char *packl_get_context_item_type_as_cstr(Context_Item_Type type);
-void packl_pop_context(PACKL_File *self);
-void packl_remove_contexts(PACKL_File *self);
 
 
 Context_Item packl_init_var_context_item(String_View name, PACKL_Type type, size_t pos);
@@ -38,5 +40,9 @@ size_t packl_get_record_field_offset(PACKL_File *self, String_View rec_name, Str
 Field packl_get_record_field(PACKL_File *self, String_View rec_name, String_View field_name);
 
 size_t packl_get_type_size(PACKL_File *self, PACKL_Type type);
+
+int packl_on_global_context(PACKL_File *self);
+Context_Item *packl_get_context_item_in_context(Context context, String_View id);
+Function *packl_find_function_in_previous_scopes(PACKL_File *self, String_View name);
 
 #endif 
