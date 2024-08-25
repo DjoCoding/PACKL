@@ -1,7 +1,7 @@
 #ifndef PACKL_ERROR_H
 #define PACKL_ERROR_H
 
-#include "../tools/error.h"
+#include "../../tools/error.h"
 
 #define PACKL_ERROR(filename, ...) \
     do { \

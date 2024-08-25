@@ -1,4 +1,4 @@
-#include "src/packl.h"
+#include "src/headers/packl.h"
 #include <time.h>
 
 typedef struct {
@@ -20,7 +20,6 @@ int args_end(Args *args) {
 void usage(char *program) {
     printf("usage: %s <filepath> [OPTIONS]\n", program);
     printf("OPTIONS:\n");
-
     printf("\thelp:     display the usage\n");
     printf("\tlex:      lex the PACKL file and display the tokens\n");
     printf("\tparse:    parse the PACKL file and display the AST\n");

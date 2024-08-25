@@ -1,4 +1,4 @@
-#include "packl-array.h"
+#include "headers/packl-array.h"
 
 void packl_generate_array_item_size(PACKL_Compiler *c, PACKL_File *self, PACKL_Type item_type, size_t indent) {
     size_t item_size = packl_get_type_size(self, item_type);

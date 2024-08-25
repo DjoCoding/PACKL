@@ -1,4 +1,4 @@
-#include "packl.h"
+#include "headers/packl.h"
 
 PACKL_Compiler packl_init(char *input, char *output) {
     PACKL_Compiler c = {0};
@@ -79,6 +79,10 @@ void packl_destroy_expr(Expression expr) {
                 free(expr.as.unary.operand);
             }
             break;
+        case EXPR_KIND_OBJECT_METHOD:
+            packl_destroy_func_call(expr.as.method->func);
+            free(expr.as.method);
+            break;
         default:
             break;
     }
@@ -149,8 +153,22 @@ void packl_destroy_mod_call(Mod_Call mod_call) {
     }
 }
 
-void packl_destroy_record(Record_Def record) {
-    free(record.fields.items);
+void packl_destroy_class(Class_Def class) {
+    free(class.attrs.items);
+}
+
+void packl_destroy_method_def(Method_Def method) {
+    if (method.kind == METHOD_KIND_FUNCTION) {
+        packl_destroy_func_def(method.as.func);
+    } else if (method.kind == METHOD_KIND_PROCEDURE) {
+        packl_destroy_proc_def(method.as.proc);
+    } else {
+        ASSERT(false, "`packl_destroy_method_def` failed because of the unknow method kind");
+    }
+}
+
+void packl_destroy_method_call(Method_Call method) {
+    packl_destroy_func_call(method.func);
 }
 
 void packl_destroy_node(Node node) {
@@ -179,8 +197,12 @@ void packl_destroy_node(Node node) {
             return;
         case NODE_KIND_MOD_CALL:
             return packl_destroy_mod_call(node.as.mod_call);
-        case NODE_KIND_RECORD:
-            return packl_destroy_record(node.as.record);
+        case NODE_KIND_CLASS:
+            return packl_destroy_class(node.as.class);
+        case NODE_KIND_METHOD_DEF:
+            return packl_destroy_method_def(node.as.method_def);
+        case NODE_KIND_METHOD_CALL:
+            return packl_destroy_method_call(node.as.method_call);
         default:
             ASSERT(false, "unreachable");
     }

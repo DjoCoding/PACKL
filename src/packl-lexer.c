@@ -1,4 +1,4 @@
-#include "packl-lexer.h"
+#include "headers/packl-lexer.h"
 
 char *symbols[] = {
     ";",
@@ -45,7 +45,7 @@ char *keywords[] = {
     "use",
     "as",
     
-    "record",
+    "class",
     
     "or",
     "and",
@@ -85,7 +85,7 @@ Token_Kind keyword_token_kinds[] = {
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
 
-    TOKEN_KIND_RECORD,
+    TOKEN_KIND_CLASS,
     
     TOKEN_KIND_OR,
     TOKEN_KIND_AND,
@@ -184,6 +184,7 @@ Token packl_lexer_lex_id(PACKL_File *self) {
     // check for keywords
     for (size_t i = 0; i < ARR_SIZE(keywords); ++i) {
         if (sv_eq(id, SV(keywords[i]))) { 
+            token.text = SV_GET(begin, size);
             token.kind = keyword_token_kinds[i];
             return token;
         }

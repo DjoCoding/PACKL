@@ -20,6 +20,6 @@ or and xor
 
 array int str 
 
-record 
+class
 
 new sizeof

@@ -1,14 +1,18 @@
-func fibo(n: int): int {    
-    if (!n) { fibo = 1; }
-    else if (n == 1) { fibo = 1; }
-    else {
-        fibo = fibo(n - 1) + fibo(n - 2);
-    }
+class Point {
+    x: int;
+    y: int;
+};
+
+func Point.setx(x: int): int {
+    this.x = x;
+}
+
+proc Point.toString() {
+    write(0, "(", this.x, ", ", this.y, ")\n");
 }
 
 proc main() {
-    var n: int = 30;
-    var result: int = fibo(n);
-    write(0, "fibo(", n, ") = ", result, "\n");
-    exit(0);
+    var p: Point = new Point;
+    p.setx(10);
+    p.toString();
 }

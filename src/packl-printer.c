@@ -1,4 +1,4 @@
-#include "packl-printer.h"
+#include "headers/packl-printer.h"
 
 char *token_kinds[] = {
     "id",
@@ -55,7 +55,7 @@ char *token_kinds[] = {
     "use",
     "as",
 
-    "record",
+    "class",
     
     "or",
     "and",
@@ -79,6 +79,7 @@ char *operator_input_kind[] = {
 void packl_print_expr(Expression expr, size_t indent);
 void packl_print_mod_call(Mod_Call mod_call, size_t indent);
 void packl_print_func_call(Func_Call func_call, size_t indent);
+void packl_print_method_call(Method_Call method, size_t indent);
 void packl_print_ast_nodes(AST ast, size_t indent);
 
 void print_indent(size_t indent) {
@@ -291,6 +292,11 @@ void packl_print_operator_expr(Expr_Operator operator, size_t indent) {
     }
 }
 
+void packl_print_object_attr_expr(Expr_Attribute attr, size_t indent) {
+    print_indent(indent);
+    printf("object name: `" SV_FMT "`, attribute: `" SV_FMT "`\n", SV_UNWRAP(attr.obj_name), SV_UNWRAP(attr.attr));
+}
+
 void packl_print_expr(Expression expr, size_t indent) {
     switch(expr.kind) {
         case EXPR_KIND_OPERATOR:
@@ -317,6 +323,10 @@ void packl_print_expr(Expression expr, size_t indent) {
             return packl_print_preunary_expr(expr.as.unary, indent);
         case EXPR_KIND_POST_UNARY_OP:
             return packl_print_postunary_expr(expr.as.unary, indent);
+        case EXPR_KIND_OBJECT_ATTRIBUTE:
+            return packl_print_object_attr_expr(expr.as.attr, indent);
+        case EXPR_KIND_OBJECT_METHOD:
+            return packl_print_method_call(*expr.as.method, indent);
         case EXPR_KIND_NOT_INITIALIZED:
             print_indent(indent);
             printf("not initialized\n");
@@ -455,13 +465,39 @@ void packl_print_mod_call(Mod_Call mod_call, size_t indent) {
     }
 }
 
-void packl_print_record(Record_Def record, size_t indent) {
+void packl_print_attr(Attribute attr, size_t indent) {
     print_indent(indent);
-    printf("record name: `" SV_FMT "`\n", SV_UNWRAP(record.name));
+    printf("name: `" SV_FMT "`", SV_UNWRAP(attr.name));
+    print_indent(indent);
+    printf("type:");
+    packl_print_type(attr.type, indent);
+}
+
+void packl_print_attrs(Attributes attrs, size_t indent) {
+    print_indent(indent);
+    printf("begin\n");
+
+    for(size_t i = 0; i < attrs.count; ++i) {
+        packl_print_attr(attrs.items[i], indent + 1);
+    }
+
+    print_indent(indent);
+    printf("end\n");
+}
+
+void packl_print_method_call(Method_Call method, size_t indent) {
+    print_indent(indent);
+    printf("object name: `" SV_FMT "`\n", SV_UNWRAP(method.object_name));
+    packl_print_func_call(method.func, indent + 1);
+}
+
+void packl_print_class(Class_Def class, size_t indent) {
+    print_indent(indent);
+    printf("class name: `" SV_FMT "`\n", SV_UNWRAP(class.name));
     
     print_indent(indent);
-    printf("fields\n");
-    packl_print_params(record.fields, indent + 1);
+    printf("attrs\n");
+    packl_print_attrs(class.attrs, indent + 1);
 }
 
 void packl_print_var_reassign(Var_Reassign var, size_t indent) {
@@ -474,9 +510,9 @@ void packl_print_var_reassign(Var_Reassign var, size_t indent) {
         print_indent(indent);
         printf("index:\n");
         packl_print_expr(var.format.as.index, indent + 1);
-    } else if (var.format.kind == VARIABLE_FORMAT_RECORD) {
+    } else if (var.format.kind == VARIABLE_FORMAT_CLASS) {
         print_indent(indent);
-        printf("type: field, `" SV_FMT "`\n", SV_UNWRAP(var.format.as.field));
+        printf("type: attr, `" SV_FMT "`\n", SV_UNWRAP(var.format.as.attr));
     } else {
         print_indent(indent);
         printf("type: basic\n");
@@ -495,6 +531,19 @@ void packl_print_func_def(Func_Def func, size_t indent) {
     printf("return type\n");
     packl_print_type(func.return_type, indent);
     packl_print_body(*func.body, indent + 1);
+}
+
+void packl_print_method_def(Method_Def method, size_t indent) {
+    print_indent(indent);
+    printf("class name: `" SV_FMT "`\n", SV_UNWRAP(method.class_name));
+
+    if (method.kind == METHOD_KIND_FUNCTION) {
+        packl_print_func_def(method.as.func, indent + 1);
+    } else if (method.kind == METHOD_KIND_PROCEDURE) {
+        packl_print_proc_def(method.as.proc, indent + 1);
+    } else {
+        ASSERT(false, "`packl_print_method_def` failed to print the method, unknow method kind");
+    }
 }
 
 void packl_print_native_call_node(Node node, size_t indent) {
@@ -546,6 +595,12 @@ void packl_print_func_def_node(Node node, size_t indent) {
     packl_print_func_def(node.as.func_def, indent + 1);
 }
 
+void  packl_print_method_def_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: method definition\n");
+    packl_print_method_def(node.as.method_def, indent + 1);
+}
+
 void packl_print_return_node(Node node, size_t indent) {
     print_indent(indent);
     printf("return:\n");
@@ -570,10 +625,16 @@ void packl_print_mod_call_node(Node node, size_t indent) {
     packl_print_mod_call(node.as.mod_call, indent + 1);
 }
 
-void packl_print_record_def_node(Node node, size_t indent) {
+void packl_print_class_def_node(Node node, size_t indent) {
     print_indent(indent);
-    printf("node kind: record defintion\n");
-    packl_print_record(node.as.record, indent + 1);
+    printf("node kind: class defintion\n");
+    packl_print_class(node.as.class, indent + 1);
+}
+
+void packl_print_method_call_node(Node node, size_t indent) {
+    print_indent(indent);
+    printf("node kind: method call\n");
+    packl_print_method_call(node.as.method_call, indent);
 }
 
 void packl_print_ast_node(Node node, size_t indent) {
@@ -602,8 +663,12 @@ void packl_print_ast_node(Node node, size_t indent) {
             return packl_print_use_node(node, indent);
         case NODE_KIND_MOD_CALL:
             return packl_print_mod_call_node(node, indent);
-        case NODE_KIND_RECORD:
-            return packl_print_record_def_node(node, indent);
+        case NODE_KIND_CLASS:
+            return packl_print_class_def_node(node, indent);
+        case NODE_KIND_METHOD_DEF:
+            return packl_print_method_def_node(node, indent);
+        case NODE_KIND_METHOD_CALL:
+            return packl_print_method_call_node(node, indent);
         default:
             ASSERT(false, "unreachable");
     }

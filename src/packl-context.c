@@ -1,4 +1,4 @@
-#include "packl-context.h"
+#include "headers/packl-context.h"
 
 size_t data_type_size[COUNT_PACKL_TYPES] = {8, 8, 8};
 
@@ -6,7 +6,7 @@ char *context_item_as_cstr[COUNT_CONTEXT_ITEM_TYPES] = {
     "procedure",
     "variable",
     "function",
-    "record",
+    "class",
 };
 
 Context packl_get_current_context(PACKL_File *self) {
@@ -114,11 +114,11 @@ size_t packl_get_user_defined_type(PACKL_File *self, String_View type_name) {
         PACKL_ERROR(self->filename, "`" SV_FMT "` type not declared yet", SV_UNWRAP(type_name));
     }
 
-    if (item->type != CONTEXT_ITEM_TYPE_RECORD) {
+    if (item->type != CONTEXT_ITEM_TYPE_CLASS) {
         PACKL_ERROR(self->filename, "`" SV_FMT "` is not a type", SV_UNWRAP(type_name));
     }
 
-    return item->as.record.size;
+    return item->as.class.attrs_size;
 }
 
 size_t packl_get_type_size(PACKL_File *self, PACKL_Type type) {
@@ -134,21 +134,37 @@ size_t packl_get_type_size(PACKL_File *self, PACKL_Type type) {
     }
 }
 
-size_t packl_get_record_size(PACKL_File *self, String_View name, Fields fields) {
+size_t packl_get_class_size(PACKL_File *self, String_View name, Attributes attrs) {
     size_t size = 0;
 
-    for(size_t i = 0; i < fields.count; ++i) {
-        Field field = fields.items[i];
-        size += packl_get_type_size(self, field.type);
+    for(size_t i = 0; i < attrs.count; ++i) {
+        Attribute attr = attrs.items[i];
+        size += packl_get_type_size(self, attr.type);
     }
 
     return size;    
 }
 
-Record packl_init_context_record(PACKL_File *self, Fields fields) {
-    Record rec = {0};
-    rec.fields = fields;
-    return rec;
+size_t packl_set_class_attrs_offset(PACKL_File *self, Attributes attrs) {
+    size_t offset = 0;
+
+    for(size_t i = 0; i < attrs.count; ++i) {
+        attrs.items[i].offset = offset;
+        attrs.items[i].type_size = packl_get_type_size(self, attrs.items[i].type);
+        offset += attrs.items[i].type_size;
+    }
+
+    // the last offset will be the size of the whole structure
+    return offset;
+}
+
+Class packl_init_context_class(PACKL_File *self, String_View name, Attributes attrs) {
+    Class class = {0};
+    class.name = name;
+    class.attrs_size = packl_set_class_attrs_offset(self, attrs);
+    class.attrs = attrs;
+    DA_INIT(&class.methods, sizeof(Function));
+    return class;
 }
 
 Function packl_init_context_function(PACKL_Type return_type, Parameters params, size_t label_value) {
@@ -158,6 +174,9 @@ Function packl_init_context_function(PACKL_Type return_type, Parameters params, 
     func.return_type = return_type;
     return func;
 }
+
+Function packl_init_context_function(PACKL_Type return_type, Parameters params, size_t label_value);
+Procedure packl_init_context_procedure(Parameters params, size_t label_value);
 
 Procedure packl_init_context_procedure(Parameters params, size_t label_value) {
     Procedure proc = {0};
@@ -192,10 +211,10 @@ Context_Item packl_init_module_context_item(String_View name, char *filename) {
     return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_MODULE, .as.module = module };
 }
 
-Context_Item packl_init_record_context_item(PACKL_File *self, String_View name, Fields fields) {
-    Record record = packl_init_context_record(self, fields);
-    record.size = packl_get_record_size(self, name, record.fields);
-    return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_RECORD, .as.record = record };
+Context_Item packl_init_class_context_item(PACKL_File *self, String_View name, Attributes attrs) {
+    Class class = packl_init_context_class(self, name, attrs);
+    DA_INIT(&class.methods, sizeof(Method));
+    return (Context_Item) { .name = name, .type = CONTEXT_ITEM_TYPE_CLASS, .as.class = class };
 }
 
 void packl_find_item_and_report_error_if_found(PACKL_File *self, String_View name, Location loc) {
@@ -217,11 +236,31 @@ Variable packl_find_variable(PACKL_File *self, String_View name, Location loc) {
     return item->as.variable;
 }
 
-Record packl_find_record(PACKL_File *self, String_View name, Location loc) {
+Class *packl_find_class(PACKL_File *self, String_View name, Location loc) {
     Context_Item *item = packl_get_context_item_in_all_contexts(self, name);
-    if (!item) { PACKL_ERROR_LOC(self->filename, loc, "record `" SV_FMT "` referenced before usage", SV_UNWRAP(name)); }
-    if (item->type != CONTEXT_ITEM_TYPE_RECORD) { PACKL_ERROR_LOC(self->filename, loc, "expected `" SV_FMT "` to be a record but found as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]); }
-    return item->as.record; 
+    if (!item) { PACKL_ERROR_LOC(self->filename, loc, "class `" SV_FMT "` referenced before usage", SV_UNWRAP(name)); }
+    if (item->type != CONTEXT_ITEM_TYPE_CLASS) { PACKL_ERROR_LOC(self->filename, loc, "expected `" SV_FMT "` to be a class but found as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]); }
+    return &item->as.class; 
+}
+
+Method *packl_find_class_method(PACKL_File *self, Class class, String_View name) {
+    for(size_t i = 0; i < class.methods.count; ++i) {
+        Method method = class.methods.items[i];
+        if (sv_eq(method.name, name)) {
+            return &class.methods.items[i];
+        }
+    }
+    return NULL;
+}
+
+Attribute *packl_find_class_attr(PACKL_File *self, Class class, String_View attr_name) {
+    for(size_t i = 0; i < class.attrs.count; ++i) {
+        Attribute attr = class.attrs.items[i];
+        if (sv_eq(attr.name, attr_name)) {
+            return &class.attrs.items[i];
+        }
+    }
+    return NULL;
 }
 
 Module packl_find_module(PACKL_File *self, String_View name, Location loc) {
@@ -256,32 +295,7 @@ PACKL_File packl_find_used_file(PACKL_File *self, char *filename) {
     ASSERT(false, "unreachable");
 }
 
-
-size_t packl_get_record_field_offset(PACKL_File *self, String_View rec_name, String_View field_name) {
-    Record record = packl_find_record(self, rec_name, (Location){0,0});
-    size_t offset = 0;
-
-    for(size_t i = 0; i < record.fields.count; ++i) {
-        Field field = record.fields.items[i];
-        if (sv_eq(field_name, field.name)) { return offset; }
-        offset += packl_get_type_size(self, field.type);
-    }
-
-    PACKL_ERROR(self->filename, "no field `" SV_FMT "` for the record `" SV_FMT "`", SV_UNWRAP(field_name), SV_UNWRAP(rec_name));
-}
-
-Field packl_get_record_field(PACKL_File *self, String_View rec_name, String_View field_name) {
-    Record record = packl_find_record(self, rec_name, (Location){0,0});
-
-    for(size_t i = 0; i < record.fields.count; ++i) {
-        Field field = record.fields.items[i];
-        if (sv_eq(field_name, field.name)) { return field; }
-    }
-
-    PACKL_ERROR(self->filename, "no field `" SV_FMT "` for the record `" SV_FMT "`", SV_UNWRAP(field_name), SV_UNWRAP(rec_name));
-}
-
-// this is used for the finding the function to execute recursion
+// this is used for finding the function to execute recursion
 Function *packl_find_function_in_previous_scopes(PACKL_File *self, String_View name) {
     if (packl_on_global_context(self)) { return NULL; }
     

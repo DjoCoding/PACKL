@@ -2,7 +2,7 @@
 #define PACKL_DEFS_H
 
 #include "packl-error.h"
-#include "../tools/sv.h"
+#include "../../tools/sv.h"
 
 typedef struct {
     size_t line;
@@ -51,13 +51,15 @@ typedef struct Proc_Def Proc_Def;
 typedef struct Use Use;
 
 // expression
+typedef struct Expr_Attribute Expr_Attribute;
+typedef struct Expr_Method_Call Expr_Method_Call;
 typedef enum Expr_Operator_Kind Expr_Operator_Kind;
 typedef enum Expr_Operator_Input_Kind Expr_Operator_Input_Kind;
 typedef union Expr_Operator_Input_As Expr_Operator_Input_As;
 typedef struct Expr_Operator_Input Expr_Operator_Input;
 typedef struct Expr_Operator Expr_Operator;
 typedef struct Expr_SizeOf Expr_SizeOf;
-typedef struct Expr_Field Expr_Field;
+typedef struct Expr_Attribute Expr_Attribute;
 typedef enum Operator Operator;
 typedef struct Expr_Unary_Op Expr_Unary_Op;
 typedef struct Expr_Bin_Op Expr_Bin_Op;
@@ -99,10 +101,13 @@ typedef enum Mod_Call_Kind Mod_Call_Kind;
 typedef union Mod_Call_As Mod_Call_As;
 typedef struct Mod_Call Mod_Call;
 
-// record
-typedef struct Record_Def Record_Def;
-typedef Parameter Field;
-typedef Parameters Fields;
+// class
+typedef struct Class_Def Class_Def;
+typedef struct Attribute Attribute;
+typedef struct Attributes Attributes;
+typedef union Method_Def_As Method_Def_As;
+typedef struct Method_Def Method_Def;
+typedef struct Method_Call Method_Call;
 
 // Nodes 
 typedef enum Node_Kind Node_Kind;
@@ -112,7 +117,11 @@ typedef struct Node Node;
 typedef struct AST AST;
 
 // Context 
-typedef struct Record Record;
+typedef enum Method_Kind Method_Kind;
+typedef union Method_As Method_As;
+typedef struct Method Method;
+typedef struct Methods Methods;
+typedef struct Class Class;
 typedef struct Module Module;
 typedef struct Function Function;
 typedef struct Variable Variable;
@@ -177,7 +186,7 @@ enum Token_Kind {
     TOKEN_KIND_IN,
     TOKEN_KIND_USE,
     TOKEN_KIND_AS,
-    TOKEN_KIND_RECORD,
+    TOKEN_KIND_CLASS,
 
     TOKEN_KIND_OR,
     TOKEN_KIND_AND,
@@ -216,8 +225,10 @@ struct Lexer {
 enum Node_Kind {
     NODE_KIND_FUNC_CALL = 0,
     NODE_KIND_NATIVE_CALL,
+    NODE_KIND_METHOD_CALL,
     NODE_KIND_PROC_DEF,
     NODE_KIND_FUNC_DEF,
+    NODE_KIND_METHOD_DEF,
     NODE_KIND_RETURN,
     NODE_KIND_VAR_DECLARATION,
     NODE_KIND_VAR_REASSIGN,
@@ -227,7 +238,7 @@ enum Node_Kind {
     NODE_KIND_FOR,
     NODE_KIND_USE,
     NODE_KIND_MOD_CALL,
-    NODE_KIND_RECORD,
+    NODE_KIND_CLASS,
 };
 
 
@@ -273,7 +284,8 @@ enum Expr_Kind {
     EXPR_KIND_MOD_CALL,
     EXPR_KIND_ARRAY,
     EXPR_KIND_ARRAY_INDEXING,
-    EXPR_KIND_RECORD_FIELD,
+    EXPR_KIND_OBJECT_ATTRIBUTE,
+    EXPR_KIND_OBJECT_METHOD,
     EXPR_KIND_NOT_INITIALIZED,
     EXPR_KIND_OPERATOR,
 };
@@ -319,9 +331,9 @@ struct Expr_Unary_Op {
     Operator op;
 };
 
-struct Expr_Field {
-    String_View root;
-    String_View field;
+struct Expr_Attribute {
+    String_View obj_name;
+    String_View attr;
 };
 
 enum Expr_Operator_Input_Kind {
@@ -352,13 +364,19 @@ struct Expr_Operator {
 union Expr_As {
     Expr_Bin_Op bin;
     Expr_Unary_Op unary;
+    
     String_View value;
+    
     int64_t integer;
     Func_Call *func;
     Mod_Call *mod;
+
+    Method_Call *method;
+    Expr_Attribute attr;
+    
     Expr_Arr arr;
     Expr_Arr_Index arr_index;
-    Expr_Field field;
+    
     Expr_Operator operator;
 };
 
@@ -378,6 +396,18 @@ struct PACKL_Args {
     size_t size;
 };
 
+struct Attribute {
+    PACKL_Type type;
+    size_t type_size;    // used later when making class contexts
+    String_View name;
+    size_t offset;
+};
+
+struct Attributes {
+    Attribute *items;
+    size_t count;
+    size_t size;
+};
 
 struct Parameter {
     PACKL_Type type;
@@ -397,15 +427,21 @@ struct Func_Def {
     PACKL_Type return_type;
 };
 
+struct Proc_Def {
+    String_View name;
+    Parameters params;
+    AST *body;
+};
+
 enum Variable_Format_Kind {
     VARIABLE_FORMAT_BASIC,
     VARIABLE_FORMAT_ARRAY,
-    VARIABLE_FORMAT_RECORD,
+    VARIABLE_FORMAT_CLASS,
 };
 
 union Variable_Format_As {
     Expression index;
-    String_View field;
+    String_View attr;
 };
 
 struct Variable_Format {
@@ -443,15 +479,30 @@ struct Var_Declaration {
     Expression value;
 };
 
-struct Proc_Def {
-    String_View name;
-    Parameters params;
-    AST *body;
+enum Method_Kind {
+    METHOD_KIND_FUNCTION = 0,
+    METHOD_KIND_PROCEDURE,
+};
+
+union Method_Def_As {
+    Func_Def func;
+    Proc_Def proc;
+};
+
+struct Method_Def {
+    Method_Kind kind;
+    String_View class_name;
+    Method_Def_As as;
 };
 
 struct Func_Call {
     String_View name;
     PACKL_Args args;
+};
+
+struct Method_Call {
+    String_View object_name;
+    Func_Call func;
 };
 
 struct Use {
@@ -476,25 +527,32 @@ struct Mod_Call {
     Mod_Call_As as;
 };
 
-struct Record_Def {
+struct Class_Def {
     String_View name;
-    Fields fields;
+    Attributes attrs;
 };
 
 union Node_As {
     Func_Call func_call;
+    Method_Call method_call;
+
     Proc_Def proc_def;
     Func_Def func_def;
-    Var_Declaration var_dec;
+    Method_Def method_def;
+
     Expression expr;
+    
     If_Statement fi;
     While_Statement hwile;
     For_Statement rof;
+    
+    Var_Declaration var_dec;
     Var_Reassign var;
     Expression ret;
+    
     Use use;
     Mod_Call mod_call;
-    Record_Def record;
+    Class_Def class;
 };
 
 struct Node {
@@ -533,9 +591,28 @@ struct Module {
     char *filename;
 };
 
-struct Record {
+union Method_As {
+    Function func;
+    Procedure proc;
+};
+
+struct Method {
+    String_View name;
+    Method_Kind kind;
+    Method_As as;
+};
+
+struct Methods {
+    Method *items;
+    size_t count;
     size_t size;
-    Fields fields;
+};   
+
+struct Class {
+    String_View name;
+    size_t attrs_size;
+    Attributes attrs;
+    Methods methods;
 };
 
 enum Context_Item_Type {
@@ -543,7 +620,7 @@ enum Context_Item_Type {
     CONTEXT_ITEM_TYPE_VARIABLE,
     CONTEXT_ITEM_TYPE_FUNCTION,
     CONTEXT_ITEM_TYPE_MODULE,
-    CONTEXT_ITEM_TYPE_RECORD,
+    CONTEXT_ITEM_TYPE_CLASS,
     COUNT_CONTEXT_ITEM_TYPES,
 };
 
@@ -552,7 +629,7 @@ union Context_Item_As {
     Variable variable;
     Function func;
     Module module;
-    Record record;
+    Class class;
 };
 
 struct Context_Item {

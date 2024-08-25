@@ -1,4 +1,4 @@
-#include "packl-codegen.h"
+#include "headers/packl-codegen.h"
 
 PACKL_File packl_init_file(char *filename, char *fullpath);
 void packl_compile_file(PACKL_Compiler *c, PACKL_File *self);
@@ -8,6 +8,7 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
 void packl_generate_func_call_node(PACKL_Compiler *c, PACKL_File *self, Node caller, Function func, size_t indent);
 void packl_generate_native_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent);
 void packl_generate_statements(PACKL_Compiler *c, PACKL_File *self, AST nodes, size_t indent);
+void packl_push_arguments(PACKL_Compiler *c, PACKL_File *self, PACKL_Args args, size_t indent);
 
 
 #define PACKL_TYPE_INTEGER    ((PACKL_Type) { .kind = PACKL_TYPE_BASIC, .as.basic = PACKL_TYPE_INT })
@@ -22,7 +23,7 @@ void packl_check_if_type_and_operator_fits_together(PACKL_File *self, PACKL_Type
     }
     
     if (type.kind == PACKL_TYPE_USER_DEFINED) {
-        PACKL_ERROR(self->filename, "no arithmetic or logic operators used with records");
+        PACKL_ERROR(self->filename, "no arithmetic or logic operators used with classs");
     }
 
     if (type.as.basic == PACKL_TYPE_STR) {
@@ -127,6 +128,58 @@ PACKL_Type packl_generate_identifier_expr_code(PACKL_Compiler *c, PACKL_File *se
     size_t var_pos = c->stack_size - var.stack_pos - 1;
     packl_generate_indup(c, var_pos, indent);
     return var.type;
+}
+
+void packl_generate_method_call(PACKL_Compiler *c, PACKL_File *self, Variable object, Method method, PACKL_Args args, size_t indent) {
+    // push the current object
+    packl_generate_indup(c, c->stack_size - object.stack_pos - 1, indent);
+
+    // push the function args
+    packl_push_arguments(c, self, args, indent);
+
+    // generate the call 
+    size_t label = 0;
+
+    if (method.kind == METHOD_KIND_FUNCTION) {
+        label = method.as.func.label_value;
+    } else if (method.kind == METHOD_KIND_PROCEDURE) {
+        label = method.as.proc.label_value;
+    } else {
+        ASSERT(false, "`packl_generate_method_call` failed to get the label value to call the method");
+    }
+
+    packl_generate_call(c, label, indent);
+
+}
+
+PACKL_Type packl_generate_method_call_expr_code(PACKL_Compiler *c, PACKL_File *self, Method_Call method_call, size_t indent) {
+    Variable object = packl_find_variable(self, method_call.object_name, (Location){0,0});
+
+    if (object.type.kind != PACKL_TYPE_USER_DEFINED) {
+        PACKL_ERROR(self->filename, "`" SV_FMT "` is not an object, it has no methods", SV_UNWRAP(method_call.object_name));
+    }
+
+    Class *class = packl_find_class(self, object.type.as.user_defined, (Location){0, 0});
+    Method *isfound = packl_find_class_method(self, *class, method_call.func.name);
+
+    if (!isfound) {
+        PACKL_ERROR(self->filename, "object `" SV_FMT "` of class `" SV_FMT "` has not method `" SV_FMT "`", SV_UNWRAP(method_call.object_name), SV_UNWRAP(class->name), SV_UNWRAP(method_call.func.name));
+    }
+
+    Method method = *isfound;
+    if (method.kind == METHOD_KIND_PROCEDURE) {
+        PACKL_ERROR(self->filename, "method `" SV_FMT "` of class returns void in an expression", SV_UNWRAP(class->name));        
+    } 
+
+    ASSERT(method.kind == METHOD_KIND_FUNCTION, "`packl_generate_method_call_expr_code` failed, not handled method kind");
+
+
+    // for the function return value
+    packl_generate_push(c, 0, indent);
+
+    packl_generate_method_call(c, self, object, method, method_call.func.args, indent);
+
+    return method.as.func.return_type;
 }
 
 PACKL_Type packl_generate_func_call_expr_code(PACKL_Compiler *c, PACKL_File *self, Func_Call func, size_t indent) {
@@ -274,25 +327,31 @@ PACKL_Type packl_generate_string_index_code(PACKL_Compiler *c, PACKL_File *self,
     return int_type;
 }
 
-PACKL_Type packl_generate_field_expr_code(PACKL_Compiler *c, PACKL_File *self, Expr_Field expr, size_t indent) {
-    Variable var = packl_find_variable(self, expr.root, (Location){0,0});
+PACKL_Type packl_generate_attr_expr_code(PACKL_Compiler *c, PACKL_File *self, Expr_Attribute expr, size_t indent) {
+    Variable var = packl_find_variable(self, expr.obj_name, (Location){0,0});
 
 
     if (var.type.kind != PACKL_TYPE_USER_DEFINED) {
-        PACKL_ERROR(self->filename, SV_FMT " is not an record", SV_UNWRAP(expr.root));
+        PACKL_ERROR(self->filename, SV_FMT " is not an class", SV_UNWRAP(expr.obj_name));
     }
 
-    // SO FUCKING UPSET OF THIS SHITTY CODE 
-    Field field = packl_get_record_field(self, var.type.as.user_defined, expr.field);
+    Class *class = packl_find_class(self, var.type.as.user_defined, (Location){0,0});
 
-    if (field.type.kind != PACKL_TYPE_BASIC) {
-        PACKL_ERROR(self->filename, "can only deal with basic record types");
+    Attribute *found = packl_find_class_attr(self, *class, expr.attr);
+    if (!found) {
+        PACKL_ERROR(self->filename, "no attr called `" SV_FMT "` for the class `" SV_FMT "`", SV_UNWRAP(expr.attr), SV_UNWRAP(class->name));
     }
 
-    size_t offset = packl_get_record_field_offset(self, var.type.as.user_defined, expr.field);
-    size_t size = packl_get_type_size(self, field.type);    
+    Attribute attr = *found;
 
-    PACKL_COMMENT(c->f, indent, "this is for the structure field");
+    if (attr.type.kind != PACKL_TYPE_BASIC) {
+        PACKL_ERROR(self->filename, "can only deal with basic class types");
+    }
+
+    size_t offset = attr.offset;
+    size_t size = packl_get_type_size(self, attr.type);    
+
+    PACKL_COMMENT(c->f, indent, "this is for the structure attr");
 
     packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
     packl_generate_push(c, (int64_t)offset, indent);
@@ -300,7 +359,7 @@ PACKL_Type packl_generate_field_expr_code(PACKL_Compiler *c, PACKL_File *self, E
     packl_generate_push(c, (int64_t)size, indent);
     packl_generate_load(c, indent);
 
-    return field.type;
+    return attr.type;
 }
 
 PACKL_Type packl_generate_array_indexing_code(PACKL_Compiler *c, PACKL_File *self, Expr_Arr_Index arr_index, size_t indent) {
@@ -439,8 +498,10 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
             return packl_generate_preunary_expr_code(c, self, expr.as.unary, indent);
         case EXPR_KIND_POST_UNARY_OP:
             return packl_generate_postunary_expr_code(c, self, expr.as.unary, indent);
-        case EXPR_KIND_RECORD_FIELD:
-            return packl_generate_field_expr_code(c, self, expr.as.field, indent);
+        case EXPR_KIND_OBJECT_ATTRIBUTE:
+            return packl_generate_attr_expr_code(c, self, expr.as.attr, indent);
+        case EXPR_KIND_OBJECT_METHOD:
+            return packl_generate_method_call_expr_code(c, self, *expr.as.method, indent);
         case EXPR_KIND_OPERATOR:    
             return packl_generate_operator_expr_code(c, self, expr.as.operator, indent);
         default:
@@ -454,13 +515,19 @@ void packl_pop_proc_scope(PACKL_Compiler *c, size_t stack_pos, size_t indent) {
     }
 }
 
+void packl_generate_proc_body_code(PACKL_Compiler *c, PACKL_File *self, Proc_Def proc, size_t indent) {
+    packl_setup_proc_params(c, self, proc.params);
+
+    packl_generate_label(c, c->label_value++, indent);
+
+    packl_generate_statements(c, self, *proc.body, indent + 1);
+}
+
 void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc_def_node, size_t indent) {
     Proc_Def proc_def = proc_def_node.as.proc_def;
     packl_find_item_and_report_error_if_found(self, proc_def.name, proc_def_node.loc);
 
-    size_t label = c->label_value++;
-
-    Context_Item new_proc = packl_init_proc_context_item(proc_def.name, proc_def.params, label);
+    Context_Item new_proc = packl_init_proc_context_item(proc_def.name, proc_def.params, c->label_value);
     packl_push_item_in_current_context(self, new_proc);
     
     packl_push_new_context(self);
@@ -469,14 +536,12 @@ void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc
     // c->stack_size = proc_def.params.count;
 
     size_t initial_stack_size = c->stack_size;
+    
     c->stack_size += proc_def.params.count;
     size_t after_args_push_stack_size = c->stack_size;
 
-    packl_setup_proc_params(c, self, proc_def.params);
 
-    packl_generate_label(c, label, indent);
-
-    packl_generate_statements(c, self, *proc_def.body, indent + 1);
+    packl_generate_proc_body_code(c, self, proc_def, indent);
 
     packl_pop_proc_scope(c, after_args_push_stack_size, indent + 1);
     c->stack_size = initial_stack_size;
@@ -517,22 +582,6 @@ void packl_handle_array_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declara
         packl_reassign_array_item_code(c, self, arr_type, arr.items[i], index, indent);
     }
 }
-
-void packl_handle_user_defined_var_dec(PACKL_Compiler *c, PACKL_File *self, Var_Declaration var_dec, size_t indent) {
-    String_View type = var_dec.type.as.user_defined;
-    
-    // check if the given type is a record or no
-    Record record = packl_find_record(self, type, (Location){0, 0});
-    
-    packl_generate_push(c, record.size, indent);
-    packl_generate_syscall(c, 2, indent);
-    
-
-    if (var_dec.value.kind != EXPR_KIND_NOT_INITIALIZED) {
-        TODO("implement the structure initialization");
-    }
-}
-
 void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_dec_node, size_t indent) {
     Var_Declaration var_dec = var_dec_node.as.var_dec;
     packl_find_item_in_current_context_and_report_error_if_found(self, var_dec.name, var_dec_node.loc);
@@ -542,7 +591,7 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
     
     if (var_dec.type.kind == PACKL_TYPE_BASIC) {
         if (var_dec.value.kind == EXPR_KIND_NOT_INITIALIZED) { 
-            c->stack_size++;
+            packl_generate_push(c, 0, indent);
             return;
         }
 
@@ -558,7 +607,9 @@ void packl_generate_var_dec_node(PACKL_Compiler *c, PACKL_File *self, Node var_d
     }
 
     if (var_dec.type.kind == PACKL_TYPE_USER_DEFINED) {
-        return packl_handle_user_defined_var_dec(c, self, var_dec, indent);
+        // no type checking for now
+        packl_generate_expr_code(c, self, var_dec.value, indent);
+        return;
     }
 
     ASSERT(false, "unreachable");
@@ -578,17 +629,25 @@ void packl_reassign_str_char_code(PACKL_Compiler *c, PACKL_File *self, Expressio
     packl_generate_storeb(c, indent);
 }
 
-void packl_reassign_record_field(PACKL_Compiler *c, PACKL_File *self, Variable var, Variable_Format fmt, Expression value, size_t indent) {
+void packl_reassign_class_attr(PACKL_Compiler *c, PACKL_File *self, Variable var, Variable_Format fmt, Expression value, size_t indent) {
     packl_generate_indup(c, c->stack_size - var.stack_pos - 1, indent);
     
-    Field field = packl_get_record_field(self, var.type.as.user_defined, fmt.as.field);
-    size_t offset = packl_get_record_field_offset(self, var.type.as.user_defined, fmt.as.field);
+    Class *class = packl_find_class(self, var.type.as.user_defined, (Location){0, 0});
+    Attribute *found = packl_find_class_attr(self, *class, fmt.as.attr);
+    
+    if (!found) {
+        PACKL_ERROR(self->filename, "no attr called `" SV_FMT "` for the class `" SV_FMT "`", SV_UNWRAP(fmt.as.attr), SV_UNWRAP(class->name));
+    }
+
+    Attribute attr = *found;
+
+    size_t offset = attr.offset;
     
     packl_generate_push(c, offset, indent);
     packl_generate_add(c, indent);
     
     PACKL_Type expr_type = packl_generate_expr_code(c, self, value, indent);
-    if (!packl_check_type_equality(expr_type, field.type)) {
+    if (!packl_check_type_equality(expr_type, attr.type)) {
         PACKL_ERROR(self->filename, "type mismatch");
     }
 
@@ -618,8 +677,8 @@ void packl_generate_var_reassign_node(PACKL_Compiler *c, PACKL_File *self, Node 
         return packl_generate_pop(c, indent);
     }
 
-    if (fmt.kind == VARIABLE_FORMAT_RECORD) {
-        return packl_reassign_record_field(c, self, var, fmt, var_reassign.value, indent);
+    if (fmt.kind == VARIABLE_FORMAT_CLASS) {
+        return packl_reassign_class_attr(c, self, var, fmt, var_reassign.value, indent);
     }
 
     if (var_reassign.value.kind == EXPR_KIND_POST_UNARY_OP) {
@@ -678,7 +737,7 @@ void packl_generate_func_call_node(PACKL_Compiler *c, PACKL_File *self, Node cal
     packl_check_caller_arity(self, caller, func.params.count);
 
     // this is for the return value
-    PACKL_COMMENT(c->f, indent, "this is for the return value");
+    PACKL_COMMENT(c->f, indent, "this is for the function return value");
     packl_generate_push(c, 0, indent);
 
     packl_push_arguments(c, self, caller.as.func_call.args, indent);
@@ -705,7 +764,7 @@ void packl_generate_call_node(PACKL_Compiler *c, PACKL_File *self, Node call_nod
 }
 
 void packl_pop_func_scope(PACKL_Compiler *c, size_t stack_pos, size_t indent) {
-    while(c->stack_size != stack_pos) {
+    while(c->stack_size > stack_pos) {
         packl_generate_pop(c, indent);
     }
 }
@@ -720,33 +779,39 @@ void packl_setup_func_params(PACKL_Compiler *c, PACKL_File *self, Func_Def func,
     packl_push_item_in_current_context(self, func_ret_var);
 }
 
+void packl_generate_func_body_code(PACKL_Compiler *c, PACKL_File *self, Func_Def func, size_t indent) {
+    // this will setup the function return value also
+    packl_setup_func_params(c, self, func, func.params);
+
+    packl_generate_label(c, c->label_value++, indent);
+
+    packl_generate_statements(c, self, *func.body, indent + 1);
+}
+
 void packl_generate_func_def_code(PACKL_Compiler *c, PACKL_File *self, Node func_def_node, size_t indent) {
     Func_Def func_def = func_def_node.as.func_def;
     packl_find_item_and_report_error_if_found(self, func_def.name, func_def_node.loc);
 
-    size_t label = c->label_value++;
-
-    Context_Item new_func = packl_init_func_context_item(func_def.name, func_def.return_type, func_def.params, label);
+    Context_Item new_func = packl_init_func_context_item(func_def.name, func_def.return_type, func_def.params, c->label_value);
     packl_push_item_in_current_context(self, new_func);
-    
-    size_t stack_size = c->stack_size;
-    c->stack_size = func_def.params.count + 1;          // + 1 for the return value
 
+    // push a new context for the function local variables
     packl_push_new_context(self);
 
-    // this will setup the function return value also
-    packl_setup_func_params(c, self, func_def, func_def.params);
+    size_t stack_size = c->stack_size;
+    // we're kinda gonna pretend that only the function parameters exist on the stack
+    c->stack_size = func_def.params.count + 1;          // + 1 for the return value
 
-    packl_generate_label(c, label, indent);
+    packl_generate_func_body_code(c, self, func_def, indent);  
 
-    packl_generate_statements(c, self, *func_def.body, indent + 1);
+    packl_pop_func_scope(c, func_def.params.count + 1, indent + 1);
 
-    packl_pop_proc_scope(c, func_def.params.count + 1, indent + 1);
+    // getting back the stack to where it was at
     c->stack_size = stack_size;
-
-    packl_pop_context(self);
-
     packl_generate_ret(c, indent + 1);
+
+    // pop the function scope
+    packl_pop_context(self);
 }
 
 void packl_generate_native_write_code(PACKL_Compiler *c, PACKL_File *self, Node caller, size_t indent) {
@@ -1093,13 +1158,133 @@ void packl_generate_mod_call_node(PACKL_Compiler *c, PACKL_File *self, Node call
 }
 
 
-void packl_handle_record_definition(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
-    Record_Def record = node.as.record;
-    String_View record_name = record.name;
-    packl_find_item_and_report_error_if_found(self, record_name, node.loc);
+void packl_handle_class_definition(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
+    Class_Def class = node.as.class;
+    String_View class_name = class.name;
+    packl_find_item_and_report_error_if_found(self, class_name, node.loc);
 
-    Context_Item context_item = packl_init_record_context_item(self, record_name, record.fields);
+    Context_Item context_item = packl_init_class_context_item(self, class_name, class.attrs);
     packl_push_item_in_current_context(self, context_item);
+}
+
+void packl_generate_proc_method_code(PACKL_Compiler *c, PACKL_File *self, Class class, Proc_Def proc, size_t indent) {
+    size_t stack_size = c->stack_size;
+    c->stack_size = proc.params.count + 1;   // for the `this` object
+
+    // push a new context for the procedure local variables
+    packl_push_new_context(self);
+
+    // setup the parameters
+    packl_setup_proc_params(c, self, proc.params);    
+
+    // setup the this object
+    PACKL_Type object_type = { .kind = PACKL_TYPE_USER_DEFINED, .as.user_defined = class.name };
+    Context_Item this = packl_init_var_context_item(SV("this"), object_type, c->stack_size - proc.params.count - 1);
+    packl_push_item_in_current_context(self, this);
+
+    packl_generate_proc_body_code(c, self, proc, indent);  
+
+    // let the function parameters and `this` and the function return value
+    packl_pop_proc_scope(c, proc.params.count + 1, indent);
+
+    c->stack_size = stack_size;
+
+    // pop the function scope
+    packl_pop_context(self);
+}
+
+void packl_generate_func_method_code(PACKL_Compiler *c, PACKL_File *self, Class class, Func_Def func, size_t indent) {
+    size_t stack_size = c->stack_size;
+    c->stack_size = func.params.count + 2;   // one for the return value and another one for the `this` object
+
+    // push a new context for the function local variables
+    packl_push_new_context(self);
+
+    // setup the parameters
+    packl_setup_proc_params(c, self, func.params);
+
+    // setup the this object
+    PACKL_Type object_type = { .kind = PACKL_TYPE_USER_DEFINED, .as.user_defined = class.name };
+    Context_Item this = packl_init_var_context_item(SV("this"), object_type, c->stack_size - func.params.count - 1);
+    packl_push_item_in_current_context(self, this);
+
+
+    // setup the function return value
+    Context_Item func_return_value = packl_init_var_context_item(func.name, func.return_type, c->stack_size - func.params.count - 2);
+    packl_push_item_in_current_context(self, func_return_value);
+
+    packl_generate_func_body_code(c, self, func, indent);  
+
+    // let the function parameters and `this` and the function return value
+    packl_pop_func_scope(c, func.params.count + 2, indent);
+
+    c->stack_size = stack_size;
+
+    // pop the function scope
+    packl_pop_context(self);
+}
+
+void packl_generate_method_def_code(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
+    Method_Def method = node.as.method_def;
+
+    Class *class = packl_find_class(self, method.class_name, node.loc);
+
+    String_View method_name;
+    if (method.kind == METHOD_KIND_FUNCTION) {
+        method_name = method.as.func.name;
+    } else if (method.kind == METHOD_KIND_PROCEDURE) {
+        method_name = method.as.proc.name;
+    } else {
+        ASSERT(false, "`packl_generate_method_def_code` failed to get the name of the method");
+    }
+
+    Method *isfound = packl_find_class_method(self, *class, method_name);
+    if (isfound) {
+        PACKL_ERROR_LOC(self->filename, node.loc, "method `" SV_FMT "` already declared in the `" SV_FMT "` class", SV_UNWRAP(method_name), SV_UNWRAP(class->name));
+    }
+
+    Method new_method = { .name = method_name, .kind = method.kind };
+    
+    if (method.kind == METHOD_KIND_FUNCTION) {
+        Func_Def as_func = method.as.func;
+        new_method.as.func = packl_init_context_function(as_func.return_type, as_func.params, c->label_value);
+
+        // generate the function
+        packl_generate_func_method_code(c, self, *class, as_func, indent);
+        DA_APPEND(&class->methods, new_method);
+    } else if (method.kind == METHOD_KIND_PROCEDURE) {
+        Proc_Def as_proc = method.as.proc;
+        new_method.as.proc = packl_init_context_procedure(as_proc.params, c->label_value);    
+    
+        // generate the procedure
+        packl_generate_proc_method_code(c, self, *class, as_proc, indent);
+        DA_APPEND(&class->methods, new_method);
+    }
+
+    packl_generate_ret(c, indent + 1);
+}
+
+void packl_generate_method_call_node(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
+    Method_Call method_call = node.as.method_call;
+
+    Variable object = packl_find_variable(self, method_call.object_name, (Location){0,0});
+
+    if (object.type.kind != PACKL_TYPE_USER_DEFINED) {
+        PACKL_ERROR(self->filename, "`" SV_FMT "` is not an object, it has no methods", SV_UNWRAP(method_call.object_name));
+    }
+
+    Class *class = packl_find_class(self, object.type.as.user_defined, (Location){0, 0});
+    Method *isfound = packl_find_class_method(self, *class, method_call.func.name);
+
+    if (!isfound) {
+        PACKL_ERROR(self->filename, "object `" SV_FMT "` of class `" SV_FMT "` has not method `" SV_FMT "`", SV_UNWRAP(method_call.object_name), SV_UNWRAP(class->name), SV_UNWRAP(method_call.func.name));
+    }
+
+    Method method = *isfound;
+
+    if (method.kind == METHOD_KIND_FUNCTION) { packl_generate_push(c, 0, indent); } // for the function return value; 
+
+    packl_generate_method_call(c, self, object, method, method_call.func.args, indent);
 }
 
 void packl_generate_statement(PACKL_Compiler *c, PACKL_File *self, Node node, size_t indent) {
@@ -1120,6 +1305,8 @@ void packl_generate_statement(PACKL_Compiler *c, PACKL_File *self, Node node, si
             return packl_generate_for_node(c, self, node, indent);
         case NODE_KIND_MOD_CALL:
             return packl_generate_mod_call_node(c, self, node, indent);
+        case NODE_KIND_METHOD_CALL:
+            return packl_generate_method_call_node(c, self, node, indent);
         default:
             PACKL_ERROR_LOC(self->filename, node.loc, "unexpected token found");
     }
@@ -1135,8 +1322,10 @@ void packl_generate_global_statement(PACKL_Compiler *c, PACKL_File *self, Node n
             return packl_generate_proc_def_code(c, self, node, indent);
         case NODE_KIND_FUNC_DEF:
             return packl_generate_func_def_code(c, self, node, indent);
-        case NODE_KIND_RECORD:
-            return packl_handle_record_definition(c, self, node, indent);
+        case NODE_KIND_METHOD_DEF:
+            return packl_generate_method_def_code(c, self, node, indent);
+        case NODE_KIND_CLASS:
+            return packl_handle_class_definition(c, self, node, indent);
         default:
             PACKL_ERROR_LOC(self->filename, node.loc, "unexpected token, consider starting a definition by a procedure, a function, a global variable declarations");
     }

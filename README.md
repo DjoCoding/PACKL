@@ -151,18 +151,20 @@ proc main() {
 }
 ```
 
-## Basic Records
+## Classes
 ```nim 
-record Point {
-    x: int;
-    y: int;
+class Person {
+    name: str;
+    age: int;
 };
 
+proc Person.setName(name: str) {
+    this.name = name;
+}
+
 proc main() {
-    var p: Point;
-    p.x = 1;
-    p.y = 2;
-    write(0, "(", p.x, ", ", p.y, ")\n");
+    var p: Person = new Person;
+    p.setName("Djaoued);
     exit(0);
 }
 ```
