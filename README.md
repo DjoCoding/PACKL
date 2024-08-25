@@ -164,11 +164,11 @@ proc Person.setName(name: str) {
 
 proc main() {
     var p: Person = new Person;
-    p.setName("Djaoued);
+    p.setName("Djaoued");
     exit(0);
 }
 ```
 
 
 # Note
-the PACKL programming language is still not a stable language, don't expect much from it!
+The PACKL programming language is still not a stable language, don't expect much from it!
