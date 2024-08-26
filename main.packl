@@ -1,18 +1,12 @@
-class Point {
-    x: int;
-    y: int;
-};
-
-func Point.setx(x: int): int {
-    this.x = x;
-}
-
-proc Point.toString() {
-    write(0, "(", this.x, ", ", this.y, ")\n");
-}
-
 proc main() {
-    var p: Point = new Point;
-    p.setx(10);
-    p.toString();
+    if (1) {
+        var x: int = 10;
+        var y: int = 20;
+    } else {
+        if (1) {
+            var x: int = 10;
+            var y: int = 20;
+        }
+        var y: int = 20;
+    }
 }

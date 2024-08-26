@@ -509,7 +509,7 @@ PACKL_Type packl_generate_expr_code(PACKL_Compiler *c, PACKL_File *self, Express
     }
 }
 
-void packl_pop_proc_scope(PACKL_Compiler *c, size_t stack_pos, size_t indent) {
+void packl_pop_scope(PACKL_Compiler *c, size_t stack_pos, size_t indent) {
     while(c->stack_size > stack_pos) {
         packl_generate_pop(c, indent);
     }
@@ -543,7 +543,7 @@ void packl_generate_proc_def_code(PACKL_Compiler *c, PACKL_File *self, Node proc
 
     packl_generate_proc_body_code(c, self, proc_def, indent);
 
-    packl_pop_proc_scope(c, after_args_push_stack_size, indent + 1);
+    packl_pop_scope(c, after_args_push_stack_size, indent + 1);
     c->stack_size = initial_stack_size;
 
     packl_pop_context(self);
@@ -763,12 +763,6 @@ void packl_generate_call_node(PACKL_Compiler *c, PACKL_File *self, Node call_nod
     ASSERT(false, "unreachable");
 }
 
-void packl_pop_func_scope(PACKL_Compiler *c, size_t stack_pos, size_t indent) {
-    while(c->stack_size > stack_pos) {
-        packl_generate_pop(c, indent);
-    }
-}
-
 void packl_setup_func_params(PACKL_Compiler *c, PACKL_File *self, Func_Def func, Parameters params) {
     // set the function parameters
     packl_setup_proc_params(c, self, params);
@@ -804,7 +798,7 @@ void packl_generate_func_def_code(PACKL_Compiler *c, PACKL_File *self, Node func
 
     packl_generate_func_body_code(c, self, func_def, indent);  
 
-    packl_pop_func_scope(c, func_def.params.count + 1, indent + 1);
+    packl_pop_scope(c, func_def.params.count + 1, indent + 1);
 
     // getting back the stack to where it was at
     c->stack_size = stack_size;
@@ -965,27 +959,42 @@ void packl_generate_if_node(PACKL_Compiler *c, PACKL_File *self, Node if_node, s
     c->label_value += 2;             // we reserve two labels for this if statement
     
     size_t stack_size = c->stack_size;
+    c->stack_size = 0;
+
     packl_generate_expr_code(c, self, fi.condition, indent);
 
+    // for the if scope
     packl_push_new_context(self);
 
     packl_generate_jz(c, label, indent);         // for the else of quit part
     
     // if body
     packl_generate_statements(c, self, *fi.body, indent);
-    
+
+    // pop the if scope
+    packl_pop_scope(c, 0, indent);
+
+    // pop the if context
+    packl_pop_context(self);
+
     packl_generate_jmp(c, label + 1, indent);    // for the quit part
     
     packl_generate_label(c, label, indent);
     if (fi.esle) {        
+        // for the else scope
+        packl_push_new_context(self);
+
         packl_generate_statements(c, self, *fi.esle, indent);
+        // pop the else scope
+        packl_pop_scope(c, 0, indent);
+
+        packl_pop_context(self);
     } 
 
     packl_generate_label(c, label + 1, indent);
 
-
+    
     c->stack_size = stack_size;
-    packl_pop_context(self);
 }
 
 
@@ -1008,6 +1017,8 @@ void packl_generate_while_node(PACKL_Compiler *c, PACKL_File *self, Node while_n
     
     // while body
     packl_generate_statements(c, self, *hwile.body, indent);
+
+    packl_pop_scope(c, stack_size, indent);
     
     packl_generate_jmp(c, label, indent);    
 
@@ -1051,6 +1062,7 @@ void packl_generate_for_node(PACKL_Compiler *c, PACKL_File *self, Node for_node,
     c->label_value += 2;      
         
     size_t stack_size = c->stack_size;
+    c->stack_size = 0;
 
     packl_check_for_arguments(self, rof);
     packl_push_new_context(self);
@@ -1067,13 +1079,14 @@ void packl_generate_for_node(PACKL_Compiler *c, PACKL_File *self, Node for_node,
     packl_generate_statements(c, self, *rof.body, indent + 1);
 
     packl_reassign_for_iter(c, self, rof, indent + 1);
+
+    packl_pop_scope(c, 1, indent); // let only the for iterator 
     
     packl_generate_jmp(c, label, indent + 1);    
 
     packl_generate_label(c, label + 1, indent);
 
-    packl_pop_proc_scope(c, stack_size, indent);
-    // c->stack_size = stack_size;
+    c->stack_size = stack_size;
 
     packl_pop_context(self);
 }
@@ -1185,7 +1198,7 @@ void packl_generate_proc_method_code(PACKL_Compiler *c, PACKL_File *self, Class 
     packl_generate_proc_body_code(c, self, proc, indent);  
 
     // let the function parameters and `this` and the function return value
-    packl_pop_proc_scope(c, proc.params.count + 1, indent);
+    packl_pop_scope(c, proc.params.count + 1, indent);
 
     c->stack_size = stack_size;
 
@@ -1216,7 +1229,7 @@ void packl_generate_func_method_code(PACKL_Compiler *c, PACKL_File *self, Class 
     packl_generate_func_body_code(c, self, func, indent);  
 
     // let the function parameters and `this` and the function return value
-    packl_pop_func_scope(c, func.params.count + 2, indent);
+    packl_pop_scope(c, func.params.count + 2, indent);
 
     c->stack_size = stack_size;
 
