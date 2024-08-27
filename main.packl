@@ -1,12 +1,5 @@
 proc main() {
-    if (1) {
-        var x: int = 10;
-        var y: int = 20;
-    } else {
-        if (1) {
-            var x: int = 10;
-            var y: int = 20;
-        }
-        var y: int = 20;
-    }
+    write(0, "10");
+    clear();
+    write(0, "djaoued\n");
 }

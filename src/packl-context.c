@@ -134,23 +134,20 @@ size_t packl_get_type_size(PACKL_File *self, PACKL_Type type) {
     }
 }
 
-size_t packl_get_class_size(PACKL_File *self, String_View name, Attributes attrs) {
-    size_t size = 0;
-
-    for(size_t i = 0; i < attrs.count; ++i) {
-        Attribute attr = attrs.items[i];
-        size += packl_get_type_size(self, attr.type);
-    }
-
-    return size;    
-}
-
-size_t packl_set_class_attrs_offset(PACKL_File *self, Attributes attrs) {
+size_t packl_set_class_attrs_offset(PACKL_File *self, String_View class_name, Attributes attrs) {
     size_t offset = 0;
 
     for(size_t i = 0; i < attrs.count; ++i) {
         attrs.items[i].offset = offset;
-        attrs.items[i].type_size = packl_get_type_size(self, attrs.items[i].type);
+        PACKL_Type attr_type = attrs.items[i].type;
+
+        // support for self referencing classes
+        if (attr_type.kind == PACKL_TYPE_USER_DEFINED && sv_eq(attr_type.as.user_defined, class_name)) {
+            attrs.items[i].type_size = 8; // sizeof(ptr)
+        } else {
+            attrs.items[i].type_size = packl_get_type_size(self, attrs.items[i].type);
+        }
+
         offset += attrs.items[i].type_size;
     }
 
@@ -161,9 +158,8 @@ size_t packl_set_class_attrs_offset(PACKL_File *self, Attributes attrs) {
 Class packl_init_context_class(PACKL_File *self, String_View name, Attributes attrs) {
     Class class = {0};
     class.name = name;
-    class.attrs_size = packl_set_class_attrs_offset(self, attrs);
+    class.attrs_size = packl_set_class_attrs_offset(self, name, attrs);
     class.attrs = attrs;
-    DA_INIT(&class.methods, sizeof(Function));
     return class;
 }
 
@@ -238,7 +234,7 @@ Variable packl_find_variable(PACKL_File *self, String_View name, Location loc) {
 
 Class *packl_find_class(PACKL_File *self, String_View name, Location loc) {
     Context_Item *item = packl_get_context_item_in_all_contexts(self, name);
-    if (!item) { PACKL_ERROR_LOC(self->filename, loc, "class `" SV_FMT "` referenced before usage", SV_UNWRAP(name)); }
+    if (!item) { PACKL_ERROR_LOC(self->filename, loc, "class `" SV_FMT "` referenced before declaration", SV_UNWRAP(name)); }
     if (item->type != CONTEXT_ITEM_TYPE_CLASS) { PACKL_ERROR_LOC(self->filename, loc, "expected `" SV_FMT "` to be a class but found as %s", SV_UNWRAP(name), context_item_as_cstr[item->type]); }
     return &item->as.class; 
 }
