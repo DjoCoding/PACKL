@@ -1,5 +1,33 @@
-proc main() {
-    write(0, "10");
-    clear();
-    write(0, "djaoued\n");
+class Point {
+    x: int;
+    y: int;
+};
+
+class Rectangle {
+    a: Point; # the point of the start (left up corner)
+    w: int;   # width
+    h: int;   # height
+};
+
+proc Point.init(x: int, y: int) {
+    this.x = x;
+    this.y = y;
 }
+
+proc Rectangle.init(x: int, y: int, w: int, h: int) {
+    var a: Point = new Point;
+    a.init(x, y);
+    this.a = a;
+    this.w = w;
+    this.h = h;
+}
+
+proc main() {
+    var r: Rectangle = new Rectangle;
+    r.init(10, 10, 20, 30);
+    write(0, "r: ", r, "\n");
+    exit(0);
+}
+
+
+# KEEP WORKING ON THE WRITE FUNCTION TO WRITE OBJECST
