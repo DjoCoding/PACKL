@@ -153,19 +153,22 @@ proc main() {
 
 ## Classes
 ```nim 
-class Person {
-    name: str;
-    age: int;
+class Point {
+    x: int;
+    y: int;
 };
 
-proc Person.setName(name: str) {
-    this.name = name;
-}
+class Rectangle {
+    a: Point; # the starting point
+    w: int;
+    h: int;
+};
 
 proc main() {
-    var p: Person = new Person;
-    p.setName("Djaoued");
-    exit(0);
+    var r: Rectangle = new Rectangle;
+    r.init(...);                    # initializing the rectangle
+    r.render(...);                  # rendering the rectangle
+    write(0, "r: ", r, "\n");       # writing the rectangle object value
 }
 ```
 
